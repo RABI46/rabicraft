@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 128" role="img" aria-label="RabiCraft">
+  <title>RabiCraft</title>
+  <rect width="128" height="128" rx="28" fill="#b70228"/>
+  <path fill="#fff" d="M38 24h36l22 22v58a4 4 0 0 1-4 4H38a4 4 0 0 1-4-4V28a4 4 0 0 1 4-4z"/>
+  <path fill="#8a011e" d="M74 24l22 22H78a4 4 0 0 1-4-4z"/>
+  <path fill="none" stroke="#b70228" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" d="M50 92V60h14a9 9 0 0 1 0 18H50m14 0l14 14"/>
+  <text x="152" y="88" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="72" font-weight="700" fill="#1a1a1a">RabiCraft</text>
+</svg>

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=RabiCraft
+GenericName=PDF Editor
+Comment=Read, organize, combine, split and secure PDFs
+Exec=rabicraft %U
+TryExec=rabicraft
+Icon=org.rabicraft.rabicraft
+Terminal=false
+StartupNotify=true
+StartupWMClass=org.rabicraft.rabicraft
+Categories=Office;Viewer;
+Keywords=pdf;viewer;editor;annotate;sign;forms;merge;split;
+MimeType=application/pdf;

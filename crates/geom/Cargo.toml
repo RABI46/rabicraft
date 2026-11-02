@@ -1,0 +1,11 @@
+[package]
+name = "rabicraft-geom"
+description = "Geometry primitives for RabiCraft (points, rects, page transforms)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

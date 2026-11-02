@@ -1,0 +1,63 @@
+[package]
+name = "rabicraft-engine"
+description = "RabiCraft engine façade: session, documents, command/tool catalogue"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+craft-docpath = { workspace = true }
+rabicraft-measure = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
+rabicraft-render = { workspace = true }
+rabicraft-cos = { workspace = true }
+rabicraft-organize = { workspace = true }
+rabicraft-annot = { workspace = true }
+rabicraft-forms = { workspace = true }
+rabicraft-xfa = { workspace = true }
+rabicraft-edit = { workspace = true }
+rabicraft-content = { workspace = true }
+rabicraft-audit = { workspace = true }
+rabicraft-redact = { workspace = true }
+rabicraft-print = { workspace = true }
+rabicraft-xfdf = { workspace = true }
+rabicraft-sign = { workspace = true }
+rabicraft-optimize = { workspace = true }
+rabicraft-a11y = { workspace = true }
+rabicraft-ocr = { workspace = true }
+rabicraft-js = { workspace = true }
+rabicraft-compare = { workspace = true }
+rabicraft-preflight = { workspace = true }
+rabicraft-export = { workspace = true }
+rabicraft-fonts = { workspace = true }
+rabicraft-create = { workspace = true }
+rabicraft-model = { workspace = true }
+rabicraft-geom = { workspace = true }
+thiserror = { workspace = true }
+png = "0.18"
+# Already in the graph (through image and rabicraft-create): image's TiffEncoder can't set the
+# resolution or the compression of an exported page.
+tiff = "0.11"
+# Already in the graph (url and idna through webbrowser, icu_properties through boa): they show
+# the host of a document's link the way the browser reads it (links::display_host).
+url = "2.5"
+idna = "1.1"
+icu_properties = "2.3"
+unicode-segmentation = "1.13"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Already in the graph through lopdf; used only for the local UTC offset ("today"). The workspace
+# entry is std-only; this target adds `clock` for `chrono::Local::now`.
+chrono = { workspace = true, features = ["clock"] }
+getrandom = "0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"] }
+
+[dev-dependencies]
+rabicraft-testkit = { workspace = true }
+# JBIG2 fixtures (`encode_jbig2_generic`).
+rabicraft-filters = { workspace = true }

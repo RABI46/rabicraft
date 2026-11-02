@@ -1,0 +1,329 @@
+{
+  "id": "rabicraft",
+  "name": "RabiCraft",
+  "upgradeCode": "EA00C367-7270-4C50-9D8B-A7A5C88AD27F",
+  "sources": [
+    "rabicraft.wxs",
+    "installer-ui.wxs"
+  ],
+  "icon": "assets/app-icon/rabicraft.ico",
+  "localization": [],
+  "extensions": [],
+  "payloads": [
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "LICENSE-document.txt",
+    "NOTICE",
+    "rabicraft-cli.exe",
+    "rabicraft.exe"
+  ],
+  "registry": [
+    [
+      "-1",
+      "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\rabicraft.exe",
+      "",
+      "[#RabicraftExe]"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\RabiCraft.Document",
+      "",
+      "PDF Document"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\RabiCraft.Document\\DefaultIcon",
+      "",
+      "\"[#RabicraftExe]\",-2"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\RabiCraft.Document\\shell\\open\\command",
+      "",
+      "\"[#RabicraftExe]\" \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\RabiCraft.Document",
+      "TypeOverlay",
+      ""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\.pdf\\OpenWithProgids",
+      "RabiCraft.Document",
+      ""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\rabicraft.exe",
+      "FriendlyAppName",
+      "RabiCraft"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\rabicraft.exe\\DefaultIcon",
+      "",
+      "\"[#RabicraftExe]\",-2"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\rabicraft.exe\\SupportedTypes",
+      ".pdf",
+      ""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\rabicraft.exe\\shell\\open\\command",
+      "",
+      "\"[#RabicraftExe]\" \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\RabiCraft\\Capabilities",
+      "ApplicationName",
+      "RabiCraft"
+    ],
+    [
+      "-1",
+      "Software\\RabiCraft\\Capabilities",
+      "ApplicationDescription",
+      "Open-source PDF workbench"
+    ],
+    [
+      "-1",
+      "Software\\RabiCraft\\Capabilities",
+      "ApplicationIcon",
+      "[#RabicraftExe],0"
+    ],
+    [
+      "-1",
+      "Software\\RabiCraft\\Capabilities\\FileAssociations",
+      ".pdf",
+      "RabiCraft.Document"
+    ],
+    [
+      "-1",
+      "Software\\RegisteredApplications",
+      "RabiCraft",
+      "Software\\RabiCraft\\Capabilities"
+    ],
+    [
+      "-1",
+      "Software\\RabiCraft\\Shortcuts",
+      "StartMenu",
+      "#1"
+    ],
+    [
+      "-1",
+      "Software\\RabiCraft\\Shortcuts",
+      "Desktop",
+      "#1"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\RabiCraft.Edit",
+      "",
+      "Edit with RabiCraft"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\RabiCraft.Edit",
+      "Icon",
+      "\"[#RabicraftExe]\",0"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\RabiCraft.Edit",
+      "MultiSelectModel",
+      "Document"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\RabiCraft.Edit\\command",
+      "",
+      "\"[#RabicraftExe]\" \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\RabiCraft.CreatePdf",
+      "",
+      "Create PDF with RabiCraft\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\RabiCraft.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\RabiCraft.CreatePdf\\command",
+      "",
+      "\"[#RabicraftExe]\" --create-images \"%1\""
+    ]
+  ],
+  "mode": "dualScope"
+}
