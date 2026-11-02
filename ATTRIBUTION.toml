@@ -3253,7 +3253,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "image"
 usage = "Finder window of the macOS DMG; rendered to background.tiff by packaging/macos/dmg/generate.py"
-sha256 = "182663e4d1c4fabbb7ab2e1f0d4e991a8e0859b4a8dee6934d3e25d77ea020af"
+sha256 = "78be9ebfc42503b810cd83ad04fd645268d00196eda5139169cb60a94962d38b"
 
 
 [[asset]]

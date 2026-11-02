@@ -1,10 +1,8 @@
 <p align="center">
-  <a href="https://getartcraft.com/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/artcraft-logo-white.svg">
-      <img alt="ArtCraft" src="docs/brand/artcraft-logo.svg" width="200">
-    </picture>
-  </a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/rabicraft-logo-white.svg">
+    <img alt="RabiCraft" src="docs/brand/rabicraft-logo.svg" width="260">
+  </picture>
 </p>
 
 
@@ -13,6 +11,8 @@
 </p>
 
 <h1 align="center">RabiCraft</h1>
+
+<p align="center"><i>A fork of <a href="https://github.com/storytold/pdfcraft">PdfCraft</a> by the ArtCraft team and the PdfCraft contributors. RabiCraft is not an ArtCraft product and is not endorsed by them.</i></p>
 
 <p align="center">
   <b>The PDF workbench; an open-source, modern PDF reader and editor, built in pure Rust.</b><br>
@@ -79,7 +79,7 @@ RabiCraft is part of [ArtCraft](https://getartcraft.com). Come say hello, get he
 - **Web page:** [getartcraft.com/apps/pdfcraft](https://getartcraft.com/apps/pdfcraft)
 - **Source:** [github.com/storytold/pdfcraft](https://github.com/storytold/pdfcraft)
 
-The ArtCraft name and logos in `docs/brand/` are trademarks of the ArtCraft Team and are not open source. They may be used only unmodified, and only as part of RabiCraft (see `docs/brand/LICENSE-brand.txt`). Forks and modified versions must remove them.
+The ArtCraft name and logos are trademarks of the ArtCraft Team and are not part of this fork; `docs/brand/` holds RabiCraft's own artwork. The links below point to the upstream PdfCraft project and community.
 
 ## Highlights
 
@@ -589,21 +589,18 @@ And [**ArtCraft**](https://getartcraft.com/) itself, our AI image and video stud
 ## License and credits
 
 RabiCraft is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
-Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors. Required notices are in [NOTICE](NOTICE).
+Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors; RabiCraft contributors (fork changes). Required notices are in [NOTICE](NOTICE).
 
 Bundled fonts, icons, images and other assets keep their own open licenses; each one is listed
 with its author, source and license in [ATTRIBUTION.md](ATTRIBUTION.md). Release builds also embed
 the Japanese fonts of [craft-fonts](https://github.com/storytold/craft-fonts/blob/main/ATTRIBUTION.md)
 (SIL Open Font License 1.1).
 
-The ArtCraft name, wordmark and logos in [`docs/brand/`](docs/brand/) are trademarks of the
-ArtCraft Team and are not covered by this license. They may be used only unmodified, and only as
-part of this repository and RabiCraft, under [`docs/brand/LICENSE-brand.txt`](docs/brand/LICENSE-brand.txt).
-Forks and modified versions must remove them.
+The ArtCraft name and logos are trademarks of the ArtCraft Team and are not covered by this license; this fork does not include them.
 
 <p align="center">
-  <a href="https://getartcraft.com/"><img alt="ArtCraft" src="docs/brand/artcraft-mark.svg" width="28"></a><br>
-  <sub>Made by the <a href="https://getartcraft.com/">ArtCraft</a> team and community.</sub>
+  <a href="https://getartcraft.com/"><img alt="ArtCraft" src="docs/brand/rabicraft-mark.svg" width="28"></a><br>
+  <sub>Based on PdfCraft, made by the <a href="https://getartcraft.com/">ArtCraft</a> team and community.</sub>
 </p>
 
 The Tools panel sits on the left, or on the right with Preferences ▸ Tools panel side. The rail stays at the right edge and opens one side panel beside it. Drag a panel's inner edge to resize it; widths are remembered. F4 shows or hides the side panel and Shift+F4 the Tools panel (also in the View menu); View ▸ Reset side panels restores the default arrangement.
