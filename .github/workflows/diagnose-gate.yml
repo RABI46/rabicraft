@@ -1,8 +1,8 @@
 name: Diagnose gate
 
 # TEMPORARY: the gate's job logs cannot be fetched from the maintainer's environment, but its
-# check-run annotations can. This calls the same gate workflow with the steps of `cargo xtask ci`
-# wrapped so that the log comes back as chunked `::error::` annotations. Deleted once green.
+# check-run annotations can. This calls the same gate workflow and ships the interesting slice of
+# `cargo xtask ci` output back as chunked annotations. Deleted once green.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -26,16 +26,20 @@ jobs:
         set +e
         cargo xtask ci > "$RUNNER_TEMP/gate.log" 2>&1
         rc=$?
-        echo "cargo xtask ci exited with $rc ($(wc -l < "$RUNNER_TEMP/gate.log") log lines)"
-        # The last lines name the failing step; keep the first mention of it too.
-        grep -n -m 3 -E '^(=== ci:|CI: )|^error(\[|:)|^warning: unused|^test .* FAILED|FAILED|panicked' "$RUNNER_TEMP/gate.log" | head -40
-        gzip -9 -c "$RUNNER_TEMP/gate.log" | base64 -w0 > "$RUNNER_TEMP/gate.b64"
-        rm -f "$RUNNER_TEMP"/part-*
-        split -b 50000 "$RUNNER_TEMP/gate.b64" "$RUNNER_TEMP/part-"
+        echo "cargo xtask ci exited with $rc"
+        grep -n '=== ci:' "$RUNNER_TEMP/gate.log" | tail -3
+        # The slice from the last step marker on, plus every compiler/test error line.
+        start=$(grep -n '=== ci:' "$RUNNER_TEMP/gate.log" | tail -1 | cut -d: -f1)
+        { echo "--- from line $start ---"
+          [ -n "$start" ] && tail -n +"$start" "$RUNNER_TEMP/gate.log" | head -260
+          echo "--- error lines ---"
+          grep -n -E '^error|^warning: unused|FAILED|panicked|^  --> ' "$RUNNER_TEMP/gate.log" | head -60
+        } > "$RUNNER_TEMP/slice.txt"
+        gzip -9 -c "$RUNNER_TEMP/slice.txt" | base64 -w0 | fold -w 3500 > "$RUNNER_TEMP/part-00"
         n=0
-        for f in "$RUNNER_TEMP"/part-*; do
+        while IFS= read -r part; do
           n=$((n + 1))
-          [ "$n" -le 10 ] || break
-          printf '::error title=gate-log-%s::%s\n' "$n" "$(cat "$f")"
-        done
+          [ "$n" -le 12 ] || break
+          printf '::error title=slice %s::%s\n' "$n" "$part"
+        done < "$RUNNER_TEMP/part-00"
         exit "$rc"
