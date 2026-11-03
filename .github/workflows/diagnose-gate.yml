@@ -32,8 +32,13 @@ jobs:
         grep -vE '^\s*(Compiling|Checking|Downloaded|Downloading|Adding|Updating|Locking|Blocking)' "$RUNNER_TEMP/plain.log" > "$RUNNER_TEMP/quiet.log"
         { echo "=== ci markers ==="
           grep -E '^=== ci:|^CI: ' "$RUNNER_TEMP/plain.log"
-          echo "=== last 220 quiet lines ==="
-          tail -220 "$RUNNER_TEMP/quiet.log"
+          echo "=== failures ==="
+          grep -c '^ *FAIL' "$RUNNER_TEMP/plain.log" || true
+          grep -n '^ *FAIL' "$RUNNER_TEMP/plain.log" | head -20
+          echo "=== summary ==="
+          grep -n -E 'Summary|tests run|failed' "$RUNNER_TEMP/plain.log" | tail -12
+          echo "=== after the last 30 log lines ==="
+          tail -30 "$RUNNER_TEMP/plain.log"
         } > "$RUNNER_TEMP/slice.txt"
         rm -f "$RUNNER_TEMP"/part-*
         split -b 2400 "$RUNNER_TEMP/slice.txt" "$RUNNER_TEMP/part-"
