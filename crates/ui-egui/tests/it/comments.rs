@@ -6,7 +6,7 @@ use egui::{Pos2, pos2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use rabicraft_render::Annotation;
-use rabicraft_ui_egui::{RabiCraftApp, QuickTool};
+use rabicraft_ui_egui::{QuickTool, RabiCraftApp};
 
 use crate::support;
 
@@ -2986,8 +2986,12 @@ fn an_upright_comment_on_a_turned_page_is_drawn_where_it_goes_before_release() {
         let a = info.annotations.iter().find(|a| a.subtype == "Square").expect("the square");
         assert!(a.no_rotate, "kept upright");
         let page = &info.pages[0];
-        let xf =
-            rabicraft_ui_egui::canvas::PageXform { rect: v.page_screen_rect(0).expect("on screen"), rot: v.rotation, pw: page.width, ph: page.height };
+        let xf = rabicraft_ui_egui::canvas::PageXform {
+            rect: v.page_screen_rect(0).expect("on screen"),
+            rot: v.rotation,
+            pw: page.width,
+            ph: page.height,
+        };
         xf.user_rect(info, 0, a.shown_rect(page.rotation))
     };
     let red = |v: [u8; 4]| v[0] > 200 && v[1] < 80 && v[2] < 80;

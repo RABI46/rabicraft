@@ -8,7 +8,7 @@ use rabicraft_engine::Edit;
 use rabicraft_engine::commands::{self, COMMANDS, CommandSpec, Shortcut};
 
 use crate::{
-    Dialog, Mode, RabiCraftApp, PropsTab, RightPanel, SaveTarget,
+    Dialog, Mode, PropsTab, RabiCraftApp, RightPanel, SaveTarget,
     theme::{ThemeKind, ThemePreference},
 };
 

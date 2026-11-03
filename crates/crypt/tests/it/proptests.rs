@@ -17,11 +17,11 @@
 //! - the AES-CBC and RC4 primitives invert each other for any key length, since `/Length` and
 //!   crypt filters from a damaged file reach them with shapes `create` would never build.
 
+use proptest::prelude::*;
 use rabicraft_crypt::{
     Algorithm, Auth, CryptError, Method, NewEncryption, PADDING, SecurityHandler, StreamKind, aes_cbc_decrypt, aes_cbc_encrypt, create,
     effective_password, pdfdoc_byte, rc4,
 };
-use proptest::prelude::*;
 
 /// The first element of `/ID`, which every R2–R4 derivation hashes in (Algorithm 2).
 const ID: &[u8] = b"\x01\x23\x45\x67\x89\xab\xcd\xef\x0f\xed\xcb\xa9\x87\x65\x43\x21";

@@ -2,7 +2,7 @@
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use rabicraft_ui_egui::{RabiCraftApp, QuickTool};
+use rabicraft_ui_egui::{QuickTool, RabiCraftApp};
 
 #[test]
 fn choosing_and_placing_stamps() {

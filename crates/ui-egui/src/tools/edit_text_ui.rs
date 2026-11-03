@@ -49,7 +49,11 @@ pub(crate) const MAX_OUTLINES: usize = 250;
 /// Format text ▸ Superscript or Subscript on `text`: on the `selection` (bytes of `text`), or all
 /// of it without one ([`rabicraft_engine::text_script::toggle`]). A selection follows the
 /// converted characters. Whether the text changed.
-pub(crate) fn toggle_script(text: &mut String, selection: &mut Option<std::ops::Range<usize>>, script: rabicraft_engine::text_script::Script) -> bool {
+pub(crate) fn toggle_script(
+    text: &mut String,
+    selection: &mut Option<std::ops::Range<usize>>,
+    script: rabicraft_engine::text_script::Script,
+) -> bool {
     if selection.as_ref().is_some_and(|r| r.is_empty()) {
         *selection = None;
     }

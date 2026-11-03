@@ -1,8 +1,8 @@
 //! Round-trip property tests (encode → decode) for every encodable filter and predictor,
 //! and fuzz-style tests feeding arbitrary bytes and parameters to every decoder.
 
-use rabicraft_filters::{Filter, FilterError, Params, decode, decode_tolerant, encode};
 use proptest::prelude::*;
+use rabicraft_filters::{Filter, FilterError, Params, decode, decode_tolerant, encode};
 
 const MAX: usize = 1 << 24;
 

@@ -456,7 +456,8 @@ fn the_table_attribute_object_holding_a_value_is_the_one_edited() {
 fn a_shared_attribute_object_is_not_changed_for_other_tags() {
     // Both cells point at attribute object 8.
     let mut doc = table_doc("<< /S /TH /A 8 0 R >>", &["<< /O /Table /Scope /Row >>"], "");
-    doc.update_dict(rabicraft_cos::ObjRef::new(7, 0), |d| d.set(b"A".to_vec(), rabicraft_cos::Object::Ref(rabicraft_cos::ObjRef::new(8, 0)))).unwrap();
+    doc.update_dict(rabicraft_cos::ObjRef::new(7, 0), |d| d.set(b"A".to_vec(), rabicraft_cos::Object::Ref(rabicraft_cos::ObjRef::new(8, 0))))
+        .unwrap();
     set_tag_property(&mut doc, rabicraft_cos::ObjRef::new(6, 0), TagProperty::Scope, Some("Both")).unwrap();
     assert_eq!(doc.get(rabicraft_cos::ObjRef::new(8, 0)).as_dict().and_then(|d| d.name(b"Scope")), Some(&b"Row"[..]));
     let a = attributes(&doc, rabicraft_cos::ObjRef::new(6, 0)).unwrap();

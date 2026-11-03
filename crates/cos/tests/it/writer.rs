@@ -60,8 +60,10 @@ fn incremental_saves_stack_on_an_xref_stream_file() {
     let mut doc = Document::open(packed.clone()).unwrap();
     // Edit an object that lives in an object stream.
     let info = doc.trailer().reference(b"Info").unwrap();
-    doc.update_dict(info, |d: &mut Dict| d.set(b"Title".to_vec(), Object::String(rabicraft_cos::PdfString { bytes: b"Second".to_vec(), hex: false })))
-        .unwrap();
+    doc.update_dict(info, |d: &mut Dict| {
+        d.set(b"Title".to_vec(), Object::String(rabicraft_cos::PdfString { bytes: b"Second".to_vec(), hex: false }))
+    })
+    .unwrap();
     let added = doc.add(Object::Int(42));
     let updated = write_incremental(&doc, &SaveOptions::default()).unwrap();
     assert!(updated.starts_with(&packed), "an incremental save only appends");

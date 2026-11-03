@@ -1,4 +1,4 @@
-use super::{RabiCraftApp, QuickTool};
+use super::{QuickTool, RabiCraftApp};
 
 impl RabiCraftApp {
     /// Whether the app draws the window's title bar, buttons and resize edges: the desktop leaves

@@ -54,8 +54,9 @@ impl FontResolver<'_> {
         }) {
             return Ok(Some(name.clone()));
         }
-        if let Some(face) =
-            rabicraft_fonts::embedding::matching_faces(&source.base_font).into_iter().find(|face| rabicraft_fonts::embedding::covers(face.bytes, text))
+        if let Some(face) = rabicraft_fonts::embedding::matching_faces(&source.base_font)
+            .into_iter()
+            .find(|face| rabicraft_fonts::embedding::covers(face.bytes, text))
         {
             return self.embed_face(face.name(), face.bytes, face.family, "the full source font could not be loaded").map(Some);
         }

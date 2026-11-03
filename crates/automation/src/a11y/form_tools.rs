@@ -154,8 +154,10 @@ impl Automation {
             acts.push((t, act));
         }
         let name = a.str("field")?.to_string();
-        let edit =
-            rabicraft_engine::Edit::SetFieldProps { name, props: Box::new(rabicraft_engine::FieldProps { actions: Some(acts), ..Default::default() }) };
+        let edit = rabicraft_engine::Edit::SetFieldProps {
+            name,
+            props: Box::new(rabicraft_engine::FieldProps { actions: Some(acts), ..Default::default() }),
+        };
         let id = self.doc(a)?.id;
         self.session.apply(id, edit).map_err(failed)?;
         self.form_actions(a)

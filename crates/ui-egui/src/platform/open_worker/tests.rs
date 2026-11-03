@@ -196,7 +196,10 @@ fn encrypted_tool_fixture() -> Vec<u8> {
     let mut session = rabicraft_engine::Session::new();
     let id = session.open("secret.pdf", None, Arc::new(fixture(2)), None).expect("open the synthetic PDF");
     session
-        .apply(id, rabicraft_engine::Edit::Protect(rabicraft_engine::Protection { open_password: Some("tool-password".into()), ..Default::default() }))
+        .apply(
+            id,
+            rabicraft_engine::Edit::Protect(rabicraft_engine::Protection { open_password: Some("tool-password".into()), ..Default::default() }),
+        )
         .expect("encrypt the synthetic PDF");
     session.save_bytes(id).expect("write the encrypted synthetic PDF").as_ref().clone()
 }

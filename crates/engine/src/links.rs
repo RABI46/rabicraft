@@ -20,9 +20,7 @@ pub struct Link {
 }
 
 /// In the order they are shown.
-pub const LINKS: &[Link] = &[
-    Link { command: "help.github", label: "RabiCraft on GitHub", url: GITHUB, icon: "code-xml" },
-];
+pub const LINKS: &[Link] = &[Link { command: "help.github", label: "RabiCraft on GitHub", url: GITHUB, icon: "code-xml" }];
 
 pub fn for_command(id: &str) -> Option<&'static Link> {
     LINKS.iter().find(|l| l.command == id)

@@ -2,7 +2,7 @@
 
 use egui::{Pos2, pos2};
 use egui_kittest::{Harness, kittest::Queryable};
-use rabicraft_ui_egui::{RabiCraftApp, QuickTool, comments::CommentTool};
+use rabicraft_ui_egui::{QuickTool, RabiCraftApp, comments::CommentTool};
 use serde_json::{Value, json};
 
 // Contributor-original blank page: no document assets or fonts are needed.

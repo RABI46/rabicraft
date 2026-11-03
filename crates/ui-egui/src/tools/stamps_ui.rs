@@ -7,7 +7,7 @@ use egui::{Align, Layout};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::{self, Tokens};
-use crate::{Dialog, RabiCraftApp, QuickTool, widgets};
+use crate::{Dialog, QuickTool, RabiCraftApp, widgets};
 
 /// Stamp files larger than this aren't kept in the library (it lives in the app's settings).
 pub const MAX_STAMP_BYTES: usize = 4 << 20;

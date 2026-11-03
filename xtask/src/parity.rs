@@ -225,8 +225,12 @@ pub fn run(args: &[String]) -> Result<()> {
     }
     let total = score(&counted);
     // Shipped features with no tool row, split by whether `command_run` can reach them.
-    let ui_only: Vec<&str> =
-        file.features.iter().filter(|f| f.status == "shipped" && f.tools.is_empty() && !headless_gap(f, &headless_commands)).map(|f| f.id.as_str()).collect();
+    let ui_only: Vec<&str> = file
+        .features
+        .iter()
+        .filter(|f| f.status == "shipped" && f.tools.is_empty() && !headless_gap(f, &headless_commands))
+        .map(|f| f.id.as_str())
+        .collect();
     let gap: Vec<&str> = file.features.iter().filter(|f| headless_gap(f, &headless_commands)).map(|f| f.id.as_str()).collect();
     if args.iter().any(|a| a == "--strict-headless") {
         for id in &gap {

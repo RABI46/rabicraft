@@ -5,7 +5,7 @@ use egui::Key;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use rabicraft_ui_egui::{Dialog, RabiCraftApp, RECENT_FILES_DEFAULT, RecentFile};
+use rabicraft_ui_egui::{Dialog, RECENT_FILES_DEFAULT, RabiCraftApp, RecentFile};
 
 use crate::support;
 

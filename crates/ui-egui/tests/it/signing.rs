@@ -5,7 +5,7 @@ use egui::{Pos2, pos2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use rabicraft_engine::SignatureStatus;
-use rabicraft_ui_egui::{Dialog, RabiCraftApp, QuickTool, RightPanel, SignStep};
+use rabicraft_ui_egui::{Dialog, QuickTool, RabiCraftApp, RightPanel, SignStep};
 
 const FIXTURE: &[u8] = b"%PDF-1.7
 1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj

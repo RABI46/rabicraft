@@ -5,7 +5,7 @@ use crate::support;
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use rabicraft_ui_egui::{LinkOrigin, RabiCraftApp, PendingLink};
+use rabicraft_ui_egui::{LinkOrigin, PendingLink, RabiCraftApp};
 
 use crate::gpu;
 

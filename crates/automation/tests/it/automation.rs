@@ -576,7 +576,8 @@ fn bookmarks_from_text_styles_through_tools() {
     assert_eq!(top["children"][0]["children"][0]["title"], "Background");
     assert_eq!(ok(&mut a, "edit_undo", json!({ "doc": doc }))["undone"], "New bookmarks from text styles");
     // What can't be done says why.
-    let call = |a: &mut rabicraft_automation::Automation, levels: Value| a.call("bookmark_from_text_styles", &json!({ "doc": doc, "levels": levels }));
+    let call =
+        |a: &mut rabicraft_automation::Automation, levels: Value| a.call("bookmark_from_text_styles", &json!({ "doc": doc, "levels": levels }));
     assert!(matches!(call(&mut a, json!([])), Err(ToolError::InvalidArgs(_))));
     assert!(matches!(call(&mut a, json!([{ "font": "Helvetica-Bold" }])), Err(ToolError::InvalidArgs(m)) if m.contains("size")));
     assert!(
@@ -7400,7 +7401,9 @@ fn detecting_form_fields_preserves_content_piece_comments() {
         let page = rabicraft_model::pages(&source)[0].obj;
         let contents = [first.as_bytes(), last]
             .iter()
-            .map(|bytes| rabicraft_cos::Object::Ref(source.add(rabicraft_cos::Object::Stream(rabicraft_cos::Stream::flate(Default::default(), bytes)))))
+            .map(|bytes| {
+                rabicraft_cos::Object::Ref(source.add(rabicraft_cos::Object::Stream(rabicraft_cos::Stream::flate(Default::default(), bytes))))
+            })
             .collect();
         source
             .update_dict(page, |d| {
@@ -7796,7 +7799,8 @@ BT /F1 12 Tf 72 640 Td (A paragraph further down.) Tj ET";
 fn hundreds_of_xfa_calculations_open_and_recalculate_through_tools() {
     let dir = workdir("xfa-many");
     let (sections, rows) = (10, 20);
-    std::fs::write(dir.join("many.pdf"), rabicraft_xfa::fixtures::shell(&rabicraft_xfa::fixtures::many_calculations_template(sections, rows))).unwrap();
+    std::fs::write(dir.join("many.pdf"), rabicraft_xfa::fixtures::shell(&rabicraft_xfa::fixtures::many_calculations_template(sections, rows)))
+        .unwrap();
     let mut a = auto(&dir).with_xfa_time_scale(100);
     let started = std::time::Instant::now();
     let opened = ok(&mut a, "doc_open", json!({ "path": "many.pdf" }));

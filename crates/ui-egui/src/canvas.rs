@@ -15,7 +15,7 @@ use rabicraft_render::{DestView, DocInfo, LayerOp, LinkTarget, PRINT_TAG, PageTe
 use crate::page_cursor::{Layer, Subject};
 use crate::page_pointer::PagePointer;
 use crate::theme::{self, Tokens};
-use crate::{RabiCraftApp, QuickTool, RightPanel, comments, icons, widgets};
+use crate::{QuickTool, RabiCraftApp, RightPanel, comments, icons, widgets};
 
 mod area;
 pub(super) mod autoscroll;

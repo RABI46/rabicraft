@@ -4,7 +4,7 @@
 use egui::{Pos2, pos2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use rabicraft_ui_egui::{RabiCraftApp, QuickTool};
+use rabicraft_ui_egui::{QuickTool, RabiCraftApp};
 
 use crate::gpu;
 
@@ -275,7 +275,8 @@ fn a_picture_on_the_clipboard_is_pasted_onto_the_page() {
     // Three frames between modifier releases represent a short real key gesture.
     let mut h = harness_with_step_dt(1.0 / 60.0);
     let v = |pressed, modifiers| egui::Event::Key { key: egui::Key::V, physical_key: None, pressed, repeat: false, modifiers };
-    let images = |h: &Harness<'static, RabiCraftApp>| added(h).iter().filter(|a| matches!(a.content, rabicraft_engine::AddedContent::Image(_))).count();
+    let images =
+        |h: &Harness<'static, RabiCraftApp>| added(h).iter().filter(|a| matches!(a.content, rabicraft_engine::AddedContent::Image(_))).count();
     // Text on the clipboard: egui gets a Paste event instead of the press; nothing lands on the page.
     h.state_mut().clipboard_override = Some(Clip::Text("hello".into()));
     h.event(egui::Event::Paste("hello".into()));
@@ -1159,7 +1160,11 @@ fn redo_after_undoing_typing_in_added_text_puts_it_back() {
     let text = rabicraft_engine::AddedText { rect, text: "Reviewed".into(), ..Default::default() };
     assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::AddText { page: 0, text: text.clone() }));
     let bold = rabicraft_engine::AddedText { bold: true, ..text };
-    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent { page: 0, index: 0, content: rabicraft_engine::AddedContent::Text(bold) }));
+    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent {
+        page: 0,
+        index: 0,
+        content: rabicraft_engine::AddedContent::Text(bold)
+    }));
     assert!(h.state_mut().execute("edit.undo"));
     assert!(h.state_mut().execute("edit.text"));
     h.run_steps(3);
@@ -1190,7 +1195,11 @@ fn redo_from_the_menu_with_retyping_in_the_box_keeps_the_documents_redo() {
     let text = rabicraft_engine::AddedText { rect, text: "Reviewed".into(), ..Default::default() };
     assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::AddText { page: 0, text: text.clone() }));
     let bold = rabicraft_engine::AddedText { bold: true, ..text };
-    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent { page: 0, index: 0, content: rabicraft_engine::AddedContent::Text(bold) }));
+    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent {
+        page: 0,
+        index: 0,
+        content: rabicraft_engine::AddedContent::Text(bold)
+    }));
     assert!(h.state_mut().execute("edit.undo"));
     assert!(h.state_mut().execute("edit.text"));
     h.run_steps(3);
@@ -1222,7 +1231,11 @@ fn undo_from_the_menu_takes_back_retyping_in_the_added_text_box() {
     let text = rabicraft_engine::AddedText { rect, text: "Reviewed".into(), ..Default::default() };
     assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::AddText { page: 0, text: text.clone() }));
     let bold = rabicraft_engine::AddedText { bold: true, ..text };
-    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent { page: 0, index: 0, content: rabicraft_engine::AddedContent::Text(bold) }));
+    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent {
+        page: 0,
+        index: 0,
+        content: rabicraft_engine::AddedContent::Text(bold)
+    }));
     assert!(h.state_mut().execute("edit.undo"));
     assert!(h.state_mut().execute("edit.text"));
     h.run_steps(3);
@@ -1440,7 +1453,11 @@ fn redo_with_an_unchanged_box_open_redoes_the_document() {
     let rabicraft_engine::AddedContent::Text(saved) = added(&h)[0].content.clone() else { panic!() };
     assert_eq!(saved.text, "Reviewed ", "the trailing space is kept");
     let bold = rabicraft_engine::AddedText { bold: true, ..saved };
-    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent { page: 0, index: 0, content: rabicraft_engine::AddedContent::Text(bold) }));
+    assert!(h.state_mut().apply_edit(rabicraft_engine::Edit::UpdateContent {
+        page: 0,
+        index: 0,
+        content: rabicraft_engine::AddedContent::Text(bold)
+    }));
     assert!(h.state_mut().execute("edit.undo"));
     assert!(h.state_mut().execute("edit.text"));
     h.run_steps(3);

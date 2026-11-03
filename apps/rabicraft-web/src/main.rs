@@ -222,9 +222,13 @@ mod host {
             let bridge = self.clone();
             Box::new(move |name: &str, bytes: &[u8], save_as: bool| {
                 let buffer = js_sys::Uint8Array::from(bytes).buffer();
-                let m =
-                    message(&[("type", "rabicraft:save".into()), ("name", name.into()), ("saveAs", save_as.into()), ("bytes", buffer.clone().into())])
-                        .ok_or_else(|| "couldn't build the message".to_string())?;
+                let m = message(&[
+                    ("type", "rabicraft:save".into()),
+                    ("name", name.into()),
+                    ("saveAs", save_as.into()),
+                    ("bytes", buffer.clone().into()),
+                ])
+                .ok_or_else(|| "couldn't build the message".to_string())?;
                 bridge.post(&m, Some(&buffer))
             })
         }

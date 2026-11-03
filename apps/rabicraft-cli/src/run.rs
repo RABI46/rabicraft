@@ -146,7 +146,10 @@ pub(crate) fn run(args: &[String]) -> Result<(), CliError> {
 /// once) out of `args`, and open the roots, which must be existing folders. Returns the arguments
 /// that are left. A malformed root flag is an error, never a root silently left out.
 #[cfg(feature = "mcp")]
-fn automation_roots(command: &str, args: &[String]) -> Result<(Option<Arc<rabicraft_automation::file_access::AutomationRoots>>, Vec<String>), String> {
+fn automation_roots(
+    command: &str,
+    args: &[String],
+) -> Result<(Option<Arc<rabicraft_automation::file_access::AutomationRoots>>, Vec<String>), String> {
     let mut found = automation_args::AutomationArgs::new(None, None);
     let mut left = Vec::new();
     let mut it = args.iter().cloned();

@@ -811,7 +811,10 @@ impl crate::RabiCraftApp {
             let (limit, too_large) = if scan {
                 (rabicraft_engine::signature_scan::MAX_PHOTO_BYTES, ScanError::Size.to_string())
             } else {
-                (rabicraft_engine::signature_image::MAX_SIGNATURE_IMAGE_BYTES, rabicraft_engine::signature_image::SignatureImageError::Size.to_string())
+                (
+                    rabicraft_engine::signature_image::MAX_SIGNATURE_IMAGE_BYTES,
+                    rabicraft_engine::signature_image::SignatureImageError::Size.to_string(),
+                )
             };
             wasm_bindgen_futures::spawn_local(async move {
                 let bytes = if let Some(file) = dialog.pick_file().await {

@@ -1,4 +1,4 @@
-use super::{LayerOp, RabiCraftApp, Pos2, Rect};
+use super::{LayerOp, Pos2, RabiCraftApp, Rect};
 
 /// A validation badge drawn over a signature widget: the widget rectangle (user space), the verdict it shows, and its hover text.
 pub(crate) struct SignatureBadge {

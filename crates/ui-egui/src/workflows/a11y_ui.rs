@@ -10,7 +10,7 @@ use rabicraft_engine::DocId;
 use rabicraft_engine::a11y::{Category, Options, Report, Rule, Status};
 
 use crate::theme::{self, Tokens};
-use crate::{Dialog, RabiCraftApp, PropsTab, RightPanel, icons, widgets};
+use crate::{Dialog, PropsTab, RabiCraftApp, RightPanel, icons, widgets};
 
 /// The options dialog's settings (kept for the session, like Acrobat's).
 #[derive(Clone, Debug, PartialEq)]

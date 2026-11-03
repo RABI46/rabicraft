@@ -107,7 +107,11 @@ fn a_field_that_doesnt_scroll_stops_taking_text_when_full() {
     let mut h = harness();
     set_city(
         &mut h,
-        rabicraft_engine::FieldProps { flags: vec![(rabicraft_engine::field_flags::DO_NOT_SCROLL, true)], font_size: Some(12.0), ..Default::default() },
+        rabicraft_engine::FieldProps {
+            flags: vec![(rabicraft_engine::field_flags::DO_NOT_SCROLL, true)],
+            font_size: Some(12.0),
+            ..Default::default()
+        },
     );
     let text_box = |h: &Harness<'static, RabiCraftApp>| {
         let s = h.state();
