@@ -1,0 +1,41 @@
+name: Diagnose gate
+
+# TEMPORARY: the gate's job logs cannot be fetched from the maintainer's environment, but its
+# check-run annotations can. This calls the same gate workflow with the steps of `cargo xtask ci`
+# wrapped so that the log comes back as chunked `::error::` annotations. Deleted once green.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    uses: storytold/craft-common-actions/.github/workflows/gate.yml@eddaf203b2d4873525a69842240214b23bac65ba
+    with:
+      os: '["ubuntu-24.04"]'
+      craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+      packages: >-
+        libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+        libgtk-3-dev qpdf poppler-utils
+      tools: cargo-nextest@0.9.150,cargo-deny@0.20.2
+      env: RABICRAFT_ORACLES_REQUIRED=1
+      command: |
+        set +e
+        cargo xtask ci > "$RUNNER_TEMP/gate.log" 2>&1
+        rc=$?
+        echo "cargo xtask ci exited with $rc ($(wc -l < "$RUNNER_TEMP/gate.log") log lines)"
+        # The last lines name the failing step; keep the first mention of it too.
+        grep -n -m 3 -E '^(=== ci:|CI: )|^error(\[|:)|^warning: unused|^test .* FAILED|FAILED|panicked' "$RUNNER_TEMP/gate.log" | head -40
+        gzip -9 -c "$RUNNER_TEMP/gate.log" | base64 -w0 > "$RUNNER_TEMP/gate.b64"
+        rm -f "$RUNNER_TEMP"/part-*
+        split -b 50000 "$RUNNER_TEMP/gate.b64" "$RUNNER_TEMP/part-"
+        n=0
+        for f in "$RUNNER_TEMP"/part-*; do
+          n=$((n + 1))
+          [ "$n" -le 10 ] || break
+          printf '::error title=gate-log-%s::%s\n' "$n" "$(cat "$f")"
+        done
+        exit "$rc"
