@@ -7,6 +7,11 @@
 //!   headlessly);
 //! - `shipped` features cite at least one test, and every cited `path::fn` exists.
 //!
+//! It also reports the AGENTS.md §3 gap: shipped features with no tool row of their own. Those
+//! whose command some tool links with `.cmd(…)` are reachable through `command_run` (UI-only
+//! surface, nothing to add); the rest are not reachable headlessly yet, and `--strict-headless`
+//! turns that list into an error so CI can adopt it once the backlog is cleared.
+//!
 //! The report gives the shipped share per tier and per area (partial counts half in the
 //! weighted figure). `--json` prints the numbers for STATUS.md; `--partial` lists partial
 //! features with their notes. Fails on any validation error.
@@ -92,6 +97,28 @@ fn quoted_after(src: &str, prefixes: &[&str]) -> HashSet<String> {
     out
 }
 
+/// Commands that `command_run` can reach: the ids a tool links with `.cmd("…")`. The link sits
+/// inside the tool's builder chain, so it is found by its own call rather than by position.
+fn linked_commands(src: &str) -> HashSet<String> {
+    let mut out = HashSet::new();
+    let mut from = 0;
+    while let Some(i) = src[from..].find(".cmd(").map(|i| i + from) {
+        from = i + ".cmd(".len();
+        if let Some(body) = src[from..].trim_start().strip_prefix('"')
+            && let Some(end) = body.find('"')
+        {
+            out.insert(body[..end].to_string());
+        }
+    }
+    out
+}
+
+/// A shipped feature with no tool row of its own and no command that `command_run` reaches: the
+/// AGENTS.md §3 gap (nothing automates it headlessly, not even through a linked command).
+fn headless_gap(f: &Feature, headless_commands: &HashSet<String>) -> bool {
+    f.status == "shipped" && f.tools.is_empty() && !f.commands.iter().any(|c| headless_commands.contains(c))
+}
+
 fn valid_id(id: &str) -> bool {
     let Some((area, name)) = id.split_once('.') else { return false };
     !area.is_empty()
@@ -172,8 +199,11 @@ pub fn run(args: &[String]) -> Result<()> {
         bail!("unsupported parity schema version {}", file.schema.version);
     }
     let commands = quoted_after(&std::fs::read_to_string(repo.join("crates/engine/src/commands.rs"))?, &["c", "ct"]);
-    let tools = quoted_after(&std::fs::read_to_string(repo.join("crates/automation/src/tools.rs"))?, &["t"]);
+    let tools_src = std::fs::read_to_string(repo.join("crates/automation/src/tools.rs"))?;
+    let tools = quoted_after(&tools_src, &["t"]);
+    let headless_commands = linked_commands(&tools_src);
     let errors = validate(&file.features, &commands, &tools, &repo);
+    let mut failures = errors.clone();
 
     // Progress: per tier and per area. N/A tier and `na` status are excluded from percentages.
     let counted: Vec<&Feature> = file.features.iter().filter(|f| f.status != "na" && f.tier != "N/A").collect();
@@ -194,13 +224,22 @@ pub fn run(args: &[String]) -> Result<()> {
         by_area.push((*a, *name, score(&fs)));
     }
     let total = score(&counted);
-    let without_headless: Vec<&str> = file.features.iter().filter(|f| f.status == "shipped" && f.tools.is_empty()).map(|f| f.id.as_str()).collect();
+    // Shipped features with no tool row, split by whether `command_run` can reach them.
+    let ui_only: Vec<&str> =
+        file.features.iter().filter(|f| f.status == "shipped" && f.tools.is_empty() && !headless_gap(f, &headless_commands)).map(|f| f.id.as_str()).collect();
+    let gap: Vec<&str> = file.features.iter().filter(|f| headless_gap(f, &headless_commands)).map(|f| f.id.as_str()).collect();
+    if args.iter().any(|a| a == "--strict-headless") {
+        for id in &gap {
+            failures.push(format!("{id}: shipped but nothing reaches it headlessly (AGENTS.md §3): name a tool, or link one with `.cmd(…)`"));
+        }
+    }
 
     if args.iter().any(|a| a == "--json") {
         let json = serde_json::json!({
             "features": file.features.len(),
             "total": { "counted": total.0, "shipped": total.1, "partial": total.2, "shipped_pct": total.3, "weighted_pct": total.4 },
             "tiers": by_tier.iter().map(|(t, s)| (t.to_string(), serde_json::json!({ "counted": s.0, "shipped": s.1, "partial": s.2, "shipped_pct": s.3 }))).collect::<serde_json::Map<_, _>>(),
+            "headless": { "ui_only": ui_only, "gap": gap },
             "errors": errors,
         });
         println!("{}", serde_json::to_string_pretty(&json)?);
@@ -221,19 +260,23 @@ pub fn run(args: &[String]) -> Result<()> {
                 println!("  {:<40} {}", f.id, f.notes);
             }
         }
-        if !without_headless.is_empty() {
-            println!(
-                "\nnote: {} shipped feature(s) have no automation tool yet (AGENTS.md §3): {}",
-                without_headless.len(),
-                without_headless.join(", ")
-            );
+        if !ui_only.is_empty() || !gap.is_empty() {
+            println!("\nAGENTS.md §3: shipped features with no tool row of their own ({}):", ui_only.len() + gap.len());
+            if !ui_only.is_empty() {
+                println!("  {} reached through command_run (a tool links the command): {}", ui_only.len(), ui_only.join(", "));
+            }
+            if !gap.is_empty() {
+                println!("  {} not reachable headlessly yet (--strict-headless fails on these; --json lists them all):", gap.len());
+                let shown = gap.iter().take(12).copied().collect::<Vec<_>>().join(", ");
+                println!("    {shown}{}", if gap.len() > 12 { format!(", … (+{} more)", gap.len() - 12) } else { String::new() });
+            }
         }
     }
-    if !errors.is_empty() {
-        for e in &errors {
+    if !failures.is_empty() {
+        for e in &failures {
             eprintln!("parity error: {e}");
         }
-        bail!("{} parity error(s)", errors.len());
+        bail!("{} parity error(s)", failures.len());
     }
     Ok(())
 }
@@ -292,5 +335,28 @@ mod tests {
             assert!(all.contains(needle), "missing {needle:?} in:\n{all}");
         }
         assert!(validate(&[f("organize.y", "shipped")], &cmds, &tools, &repo)[0].contains("at least one test"));
+    }
+
+    #[test]
+    fn a_shipped_feature_without_a_tool_is_split_by_reachability() {
+        let headless = HashSet::from(["view.fit_one_page".to_string()]);
+        // A UI-only command a tool links: reached through command_run, not a gap.
+        let mut linked = f("view.zoom-fit-page", "shipped");
+        linked.commands = vec!["view.fit_one_page".into()];
+        assert!(!headless_gap(&linked, &headless));
+        // The same feature with nothing reaching it headlessly: a gap.
+        assert!(headless_gap(&linked, &HashSet::new()));
+        // Its own tool, or not shipped: not a gap either way.
+        let mut tooled = f("organize.rotate", "shipped");
+        tooled.tools = vec!["page_rotate".into()];
+        assert!(!headless_gap(&tooled, &HashSet::new()));
+        assert!(!headless_gap(&f("organize.planned", "planned"), &HashSet::new()));
+    }
+
+    #[test]
+    fn command_links_are_read_from_the_tool_table() {
+        let src = r#"t("doc_save", "Save").destructive().cmd("file.save").with(schema(json!({}), &[])), t("edit_undo", "Undo").cmd("edit.undo").with(x), format(x)"#;
+        assert_eq!(linked_commands(src), HashSet::from(["file.save".to_string(), "edit.undo".to_string()]));
+        assert!(linked_commands("t(\"a\", \"b\").with(x)").is_empty());
     }
 }

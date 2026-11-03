@@ -23,7 +23,8 @@ permissions:
 
 jobs:
   freebsd:
-    # Intentionally tracked at @main (not SHA-pinned) so org-wide CI improvements, security fixes, and build optimizations propagate without PR churn across all craftapp repos.
-    uses: storytold/craft-common-actions/.github/workflows/freebsd.yml@main
+    # Pinned to the reviewed commit (not @main): this fork runs the shared workflow with its own
+    # secrets, so a change reaches it only through a reviewed bump of this line.
+    uses: storytold/craft-common-actions/.github/workflows/freebsd.yml@eddaf203b2d4873525a69842240214b23bac65ba
     with:
       craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
