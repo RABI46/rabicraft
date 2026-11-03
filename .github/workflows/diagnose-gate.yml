@@ -27,19 +27,20 @@ jobs:
         cargo xtask ci > "$RUNNER_TEMP/gate.log" 2>&1
         rc=$?
         echo "cargo xtask ci exited with $rc"
-        grep -n '=== ci:' "$RUNNER_TEMP/gate.log" | tail -3
-        # The slice from the last step marker on, plus every compiler/test error line.
-        start=$(grep -n '=== ci:' "$RUNNER_TEMP/gate.log" | tail -1 | cut -d: -f1)
-        { echo "--- from line $start ---"
-          [ -n "$start" ] && tail -n +"$start" "$RUNNER_TEMP/gate.log" | head -260
-          echo "--- error lines ---"
-          grep -n -E '^error|^warning: unused|FAILED|panicked|^  --> ' "$RUNNER_TEMP/gate.log" | head -60
+        sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/gate.log" > "$RUNNER_TEMP/plain.log"
+        grep -n '=== ci:' "$RUNNER_TEMP/plain.log" | tail -2
+        grep -vE '^\s*(Compiling|Checking|Downloaded|Downloading|Adding|Updating|Locking|Blocking)' "$RUNNER_TEMP/plain.log" > "$RUNNER_TEMP/quiet.log"
+        { echo "=== ci markers ==="
+          grep -E '^=== ci:|^CI: ' "$RUNNER_TEMP/plain.log"
+          echo "=== last 220 quiet lines ==="
+          tail -220 "$RUNNER_TEMP/quiet.log"
         } > "$RUNNER_TEMP/slice.txt"
-        gzip -9 -c "$RUNNER_TEMP/slice.txt" | base64 -w0 | fold -w 3500 > "$RUNNER_TEMP/part-00"
+        rm -f "$RUNNER_TEMP"/part-*
+        split -b 2400 "$RUNNER_TEMP/slice.txt" "$RUNNER_TEMP/part-"
         n=0
-        while IFS= read -r part; do
+        for f in "$RUNNER_TEMP"/part-*; do
           n=$((n + 1))
           [ "$n" -le 12 ] || break
-          printf '::error title=slice %s::%s\n' "$n" "$part"
-        done < "$RUNNER_TEMP/part-00"
+          printf '::error title=slice %s::%s\n' "$n" "$(gzip -9 -c "$f" | base64 -w0)"
+        done
         exit "$rc"
