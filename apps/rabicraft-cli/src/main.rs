@@ -94,7 +94,7 @@ rabicraft-cli run    --script steps.json [--root DIR] [--report]
     "\
 rabicraft-cli ui     --control FILE <method> [key=value …] [--out shot.png]
                                                            drive a running app started with --control FILE
-help and feedback: https://discord.gg/artcraft"
+source and feedback: https://github.com/RABI46/rabicraft"
 );
 
 fn main() -> ExitCode {
@@ -190,8 +190,6 @@ fn stdout_line(line: std::fmt::Arguments<'_>) -> Result<(), CliError> {
 
 fn version() -> Result<(), CliError> {
     stdout_line(format_args!("rabicraft-cli {}", rabicraft_engine::build_info::version()))?;
-    stdout_line(format_args!("Discord: {}  (help and feedback)", rabicraft_engine::links::DISCORD))?;
-    stdout_line(format_args!("Web:     {}", rabicraft_engine::links::APP_PAGE))?;
     stdout_line(format_args!("Source:  {}", rabicraft_engine::links::GITHUB))?;
     Ok(())
 }

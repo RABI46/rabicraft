@@ -153,7 +153,7 @@ impl McpServer {
                 Ok(json!({
                     "protocolVersion": version,
                     "capabilities": { "tools": { "listChanged": false }, "resources": { "listChanged": false, "subscribe": false } },
-                    "serverInfo": { "name": "rabicraft", "title": "RabiCraft", "version": env!("CARGO_PKG_VERSION"), "websiteUrl": rabicraft_engine::links::APP_PAGE },
+                    "serverInfo": { "name": "rabicraft", "title": "RabiCraft", "version": env!("CARGO_PKG_VERSION"), "websiteUrl": rabicraft_engine::links::GITHUB },
                     "instructions": if self.compact { format!("{INSTRUCTIONS}{COMPACT_INSTRUCTIONS}") } else { INSTRUCTIONS.to_string() },
                 }))
             }

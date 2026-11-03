@@ -55,7 +55,7 @@ if (-not $haveCert -and -not $haveAzure) {
 }
 
 $script:SignTool = Find-SignTool
-$common = @('sign', '/v', '/fd', 'SHA256', '/td', 'SHA256', '/d', 'RabiCraft', '/du', 'https://github.com/storytold/pdfcraft')
+$common = @('sign', '/v', '/fd', 'SHA256', '/td', 'SHA256', '/d', 'RabiCraft', '/du', 'https://github.com/RABI46/rabicraft')
 $tmp = Join-Path ([IO.Path]::GetTempPath()) "rabicraft-sign-$([IO.Path]::GetRandomFileName())"
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
