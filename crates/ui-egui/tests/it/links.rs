@@ -31,7 +31,7 @@ fn home_screen_links() {
     for (label, url) in [
         ("Join our Discord", links::DISCORD),
         ("RabiCraft web page", "https://getartcraft.com/apps/pdfcraft"),
-        ("RabiCraft on GitHub", "https://github.com/storytold/pdfcraft"),
+        ("RabiCraft on GitHub", "https://github.com/RABI46/rabicraft"),
         ("ArtCraft website", "https://getartcraft.com"),
     ] {
         let mut h = harness(|_| {});

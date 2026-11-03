@@ -10,7 +10,7 @@ pub const APP: &str = "rabicraft";
 pub const DISCORD: &str = "https://discord.gg/artcraft";
 pub const WEBSITE: &str = "https://getartcraft.com";
 pub const APP_PAGE: &str = "https://getartcraft.com/apps/pdfcraft";
-pub const GITHUB: &str = "https://github.com/storytold/pdfcraft";
+pub const GITHUB: &str = "https://github.com/RABI46/rabicraft";
 
 /// A link and the registry command that opens it.
 #[derive(Clone, Copy, Debug)]

@@ -17,8 +17,8 @@ pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
     accent: Some([0xb7, 0x02, 0x28]),
     id: "rabicraft",
     name: "RabiCraft",
-    // Fork: releases come from this repository, never from upstream PdfCraft's. Set it to the real fork's `owner/repo`.
-    repo: "rabicraft/rabicraft",
+    // Fork: releases come from this repository, never from upstream PdfCraft's. This fork's `owner/repo`.
+    repo: "RABI46/rabicraft",
     former_ids: &[],
     former_names: &[],
     developer: "RabiCraft contributors",
