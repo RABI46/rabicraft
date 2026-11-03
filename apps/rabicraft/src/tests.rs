@@ -419,10 +419,12 @@ fn winit_carries_the_windows_11_monitor_scale_fix() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     assert_window_stack_graph(&root, "winit", "0.30.13");
     let event_loop = std::fs::read_to_string(root.join("vendor/winit/src/platform_impl/windows/event_loop.rs")).unwrap();
+    // Vendored patches are still marked `PdfCraft patch:` (vendor/README.md line 26 promises it):
+    // they record who wrote the hunk upstream, which a fork renaming its crates does not change.
     // The audited W1 hunk itself, not merely the file's presence: Windows 11 applies the
     // rect Windows suggests, while Windows 10 keeps the old adjustment.
     for marker in [
-        "RabiCraft patch: from Windows 11 (build 22000) on, apply the rect Windows suggests",
+        "PdfCraft patch: from Windows 11 (build 22000) on, apply the rect Windows suggests",
         "if !WIN10_BUILD_VERSION.is_some_and(|build| build < 22000) {",
         "new_outer_rect = suggested_rect;",
     ] {
