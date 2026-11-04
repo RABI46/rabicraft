@@ -24,6 +24,9 @@ on:
 
 permissions:
   contents: read
+  # TEMPORARY: the failed build's log is reported on the pull request, because a job's log cannot
+  # be read back from outside the run. Removed once the build is green.
+  pull-requests: write
 
 # A newer push to a PR branch cancels its older run.
 concurrency:
@@ -87,7 +90,7 @@ jobs:
           if [ "$rc" -ne 0 ]; then
             # The job log is not always retrievable from outside; annotations are.
             n=0
-            grep -E 'error|e: |FAILURE|What went wrong|trunk|Caused by' "$RUNNER_TEMP/plain.log" | tail -12 | while IFS= read -r line; do
+            grep -E '^(error|Error|FAILURE|\* What went wrong|What went wrong|Caused by|e: )|^error\[|^error: ' "$RUNNER_TEMP/plain.log" | tail -12 | while IFS= read -r line; do
               n=$((n + 1))
               printf '::error title=build %s::%s\n' "$n" "${line:0:900}"
             done
@@ -103,6 +106,26 @@ jobs:
           path: ${{ runner.temp }}/plain.log
           if-no-files-found: ignore
           retention-days: 5
+      - name: Report the failure on the pull request
+        # TEMPORARY, with the pull-requests permission above: removed once the build is green.
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          {
+            echo "Android build failed."
+            echo
+            echo '```'
+            grep -E '^(error|Error|FAILURE|\* What went wrong|Caused by|e: )|error:|warning: unused' "$RUNNER_TEMP/plain.log" | tail -60
+            echo '```'
+            echo
+            echo '```'
+            tail -40 "$RUNNER_TEMP/plain.log"
+            echo '```'
+          } > "$RUNNER_TEMP/report.md"
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/report.md"
       - name: Test the host page
         run: |
           set -euo pipefail
