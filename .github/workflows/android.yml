@@ -79,8 +79,20 @@ jobs:
           key: android
       - name: Build the APK
         run: |
-          set -euo pipefail
-          packaging/android/package.sh
+          set +e
+          packaging/android/package.sh > "$RUNNER_TEMP/build.log" 2>&1
+          rc=$?
+          sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/build.log" > "$RUNNER_TEMP/plain.log"
+          tail -40 "$RUNNER_TEMP/plain.log"
+          if [ "$rc" -ne 0 ]; then
+            # The job log is not always retrievable from outside; annotations are.
+            n=0
+            grep -E 'error|e: |FAILURE|What went wrong|trunk|Caused by' "$RUNNER_TEMP/plain.log" | tail -12 | while IFS= read -r line; do
+              n=$((n + 1))
+              printf '::error title=build %s::%s\n' "$n" "${line:0:900}"
+            done
+            exit "$rc"
+          fi
           # The page inside the APK must be the browser build, not an empty folder.
           unzip -l dist/release/rabicraft-*-android.apk | grep -q 'assets/web/index.html'
       - name: Test the host page
