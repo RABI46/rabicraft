@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The adaptive icon, drawn from the repository's own artwork: packaging/icons.sh generates the
-     PNGs under res/mipmap-*/ from assets/app-icon/rabicraft-1024.png. -->
+<!-- The adaptive icon: the master artwork (generated from assets/app-icon/rabicraft.svg by
+     packaging/android/icons.py) on the launcher's own background colour. minSdk is 26, so every
+     device that installs RabiCraft reads this file. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
