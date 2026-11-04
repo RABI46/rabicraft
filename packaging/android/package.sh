@@ -30,8 +30,10 @@ if [[ "${1:-}" != "--skip-web" ]]; then
 fi
 [[ -f "$WEB/index.html" ]] || { echo "error: $WEB/index.html missing; rerun without --skip-web" >&2; exit 1; }
 
-# The launcher icon is generated from the committed master; refuse a stale one.
+# The launcher icon is generated from the committed master; refuse a stale one, and refuse a
+# resource reference the APK has no file for (AAPT2 would only say so at link time).
 python3 "$HERE/icons.py" --check
+python3 "$HERE/check-resources.py"
 
 # The version the APK reports comes from the one place it lives.
 sed -i.bak -E "s/versionName = \"[^\"]*\"/versionName = \"$VERSION\"/" "$APP/build.gradle.kts"
