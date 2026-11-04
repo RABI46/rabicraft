@@ -370,7 +370,8 @@ fn format_section(app: &mut RabiCraftApp, ui: &mut egui::Ui, t: &Tokens) {
             added_text_format(ui, t, &mut style, None);
             if style != text {
                 // The reusable style follows the selection only when the edit took, so a refused one adds nothing odd later.
-                if app.apply_edit(rabicraft_engine::Edit::UpdateContent { page, index, content: rabicraft_engine::AddedContent::Text(style.clone()) }) {
+                if app.apply_edit(rabicraft_engine::Edit::UpdateContent { page, index, content: rabicraft_engine::AddedContent::Text(style.clone()) })
+                {
                     app.text_style = rabicraft_engine::AddedText { text: String::new(), rect: [0.0; 4], aligns: Vec::new(), ..style };
                 }
             }
@@ -424,8 +425,11 @@ impl RabiCraftApp {
         if updated == committed {
             return;
         }
-        if self.apply_edit(rabicraft_engine::Edit::UpdateContent { page, index: item, content: rabicraft_engine::AddedContent::Text(updated.clone()) })
-            && let Some(d) = self.views.get_mut(index).and_then(|v| v.content.draft.as_mut())
+        if self.apply_edit(rabicraft_engine::Edit::UpdateContent {
+            page,
+            index: item,
+            content: rabicraft_engine::AddedContent::Text(updated.clone()),
+        }) && let Some(d) = self.views.get_mut(index).and_then(|v| v.content.draft.as_mut())
         {
             // What the page has now. The aligns stay those of the text in the box.
             d.style = rabicraft_engine::AddedText { aligns: std::mem::take(&mut d.style.aligns), ..updated };

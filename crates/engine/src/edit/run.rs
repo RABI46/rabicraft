@@ -313,7 +313,8 @@ fn run_edit_page_image(doc: &mut rabicraft_cos::Document, page: usize, index: us
         },
     };
 
-    let added_items: Vec<(usize, rabicraft_edit::Added)> = rabicraft_edit::list_added(doc).into_iter().filter(|a| a.page == page).enumerate().collect();
+    let added_items: Vec<(usize, rabicraft_edit::Added)> =
+        rabicraft_edit::list_added(doc).into_iter().filter(|a| a.page == page).enumerate().collect();
     // Ownership belongs to the drawing stream, not the XObject: original and added images may
     // show the same resource without sharing an editable item.
     let shows_image = |a: &rabicraft_edit::Added| img.object.is_some_and(|t| matches!(&a.content, AddedContent::Image(ai) if ai.image == t));
@@ -786,7 +787,9 @@ pub(crate) fn run_edit(doc: &mut rabicraft_cos::Document, edit: &Edit, cx: &mut 
         Edit::AddLink { page, rect, action, style } => {
             rabicraft_annot::links::add(doc, *page, *rect, action, style)?;
         }
-        Edit::SetLink { page, index, rect, action, style } => rabicraft_annot::links::set(doc, *page, *index, *rect, action.as_ref(), style.as_ref())?,
+        Edit::SetLink { page, index, rect, action, style } => {
+            rabicraft_annot::links::set(doc, *page, *index, *rect, action.as_ref(), style.as_ref())?
+        }
         Edit::DeleteLink { page, index } => rabicraft_annot::links::delete(doc, *page, *index)?,
         Edit::RemoveLinks { pages } => {
             if rabicraft_annot::links::remove_all(doc, pages.as_deref())? == 0 {

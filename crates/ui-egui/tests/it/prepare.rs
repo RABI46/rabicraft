@@ -6,7 +6,7 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{Queryable, by};
 use rabicraft_engine::field_table::TableColumn;
-use rabicraft_ui_egui::{Dialog, RabiCraftApp, QuickTool};
+use rabicraft_ui_egui::{Dialog, QuickTool, RabiCraftApp};
 
 fn harness() -> Harness<'static, RabiCraftApp> {
     harness_with("form.pdf", include_bytes!("../data/form.pdf").to_vec())

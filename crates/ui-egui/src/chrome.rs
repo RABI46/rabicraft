@@ -5,7 +5,7 @@ use egui::{Align, Color32, CornerRadius, Layout, Rect, Sense, Stroke, vec2};
 
 use crate::canvas::{DocView, Fit, PageLayout};
 use crate::theme::{self, ThemePreference, Tokens};
-use crate::{Dialog, Mode, RabiCraftApp, PropsTab, RightPanel, icons, widgets, window_controls};
+use crate::{Dialog, Mode, PropsTab, RabiCraftApp, RightPanel, icons, widgets, window_controls};
 
 /// Height of the tab strip when it doubles as the macOS title bar (#789). AppKit draws the traffic
 /// lights itself, centred in the standard 28 pt title-bar band at the top of the window, and moving
@@ -70,9 +70,7 @@ pub fn tab_strip(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
                     app.combine_tab.focused = false;
                 }
                 // Reserve the three icon buttons and their gaps outside the scrolling tabs.
-                let controls_width = 3.0 * button
-                    + 54.0
-                    + window_controls::width(&controls.right);
+                let controls_width = 3.0 * button + 54.0 + window_controls::width(&controls.right);
                 // Open stays in sight after the tabs: its icon, text and padding, and the gaps around it.
                 let open_width = ui.fonts_mut(|f| f.layout_no_wrap(tl!("Open").into(), theme::medium(13.0), t.text).size().x) + 38.0 + 12.0;
                 let mut tabs_width = (ui.available_width() - controls_width - open_width).max(0.0);

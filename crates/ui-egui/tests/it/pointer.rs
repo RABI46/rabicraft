@@ -11,7 +11,7 @@ use egui_kittest::kittest::Queryable;
 use rabicraft_engine::StampKind;
 use rabicraft_ui_egui::comments::CommentTool;
 use rabicraft_ui_egui::fill_sign::FillTool;
-use rabicraft_ui_egui::{RabiCraftApp, QuickTool, UnlockPrompt};
+use rabicraft_ui_egui::{QuickTool, RabiCraftApp, UnlockPrompt};
 
 use crate::support::input::{coalesced_click, double_click, one_frame, touch_drag, touch_tap};
 

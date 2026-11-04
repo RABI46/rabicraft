@@ -1,5 +1,5 @@
 //! Measure objects: page-space clicks, live readings and persistent drawing scales.
-use crate::{LeftPanel, RabiCraftApp, QuickTool, canvas::DocView, page_cursor::Layer, theme::Tokens, widgets};
+use crate::{LeftPanel, QuickTool, RabiCraftApp, canvas::DocView, page_cursor::Layer, theme::Tokens, widgets};
 use egui::{Color32, Pos2, Stroke};
 use rabicraft_engine::{
     Document, Edit, Style,

@@ -294,8 +294,10 @@ fn walk_pages(doc: &Document, pages: &[ObjRef]) -> (HashMap<ObjRef, f64>, HashSe
 fn device_rgb(doc: &Document, r: ObjRef) -> bool {
     let Object::Stream(s) = &*doc.get(r) else { return false };
     let cs = s.dict.get(b"ColorSpace").map(|cs| doc.resolve(cs));
-    let codec =
-        s.filters().iter().any(|(f, _)| matches!(f, rabicraft_filters::Filter::Dct | rabicraft_filters::Filter::Jpx | rabicraft_filters::Filter::Jbig2));
+    let codec = s
+        .filters()
+        .iter()
+        .any(|(f, _)| matches!(f, rabicraft_filters::Filter::Dct | rabicraft_filters::Filter::Jpx | rabicraft_filters::Filter::Jbig2));
     s.dict.int(b"BitsPerComponent") == Some(8)
         && !codec
         && cs.as_deref().and_then(Object::as_name).is_some_and(|n| matches!(n, b"DeviceRGB" | b"RGB"))

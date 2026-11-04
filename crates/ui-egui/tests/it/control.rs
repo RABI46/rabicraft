@@ -249,7 +249,14 @@ fn production_key_release_survives_the_focus_change_its_press_causes() {
 #[test]
 fn production_drag_releases_the_button_after_the_press_moves_focus() {
     let (mut h, c) = harness_pages(2);
-    h.state_mut().apply_edit(rabicraft_engine::Edit::AddBookmark { parent: vec![], index: 0, title: "Target".into(), page: 0, left: None, top: None });
+    h.state_mut().apply_edit(rabicraft_engine::Edit::AddBookmark {
+        parent: vec![],
+        index: 0,
+        title: "Target".into(),
+        page: 0,
+        left: None,
+        top: None,
+    });
     ok(&mut h, &c, "ui.set", json!({"key": "panel", "value": "bookmarks"}));
     let field = ok(&mut h, &c, "ui.inspect", json!({"query": "Search", "role": "TextInput"}));
     let rect = field["widgets"][0]["rect"].as_array().expect("the search field has a rect");
@@ -281,7 +288,14 @@ fn control_button_focus_preserves_document_undo_redo_shortcuts() {
 #[test]
 fn control_text_focus_retains_text_undo_ownership() {
     let (mut h, c) = harness_pages(2);
-    h.state_mut().apply_edit(rabicraft_engine::Edit::AddBookmark { parent: vec![], index: 0, title: "Target".into(), page: 0, left: None, top: None });
+    h.state_mut().apply_edit(rabicraft_engine::Edit::AddBookmark {
+        parent: vec![],
+        index: 0,
+        title: "Target".into(),
+        page: 0,
+        left: None,
+        top: None,
+    });
     ok(&mut h, &c, "ui.command", json!({"id": "page.insert_blank"}));
     ok(&mut h, &c, "ui.set", json!({"key": "panel", "value": "bookmarks"}));
     let widgets = ok(&mut h, &c, "ui.inspect", json!({"query": "Search", "role": "TextInput"}));

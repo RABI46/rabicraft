@@ -190,7 +190,7 @@ xkbcommon) and the GPU (Vulkan, EGL) are loaded at runtime from the system; the 
 them as dependencies (see `nfpm.yaml`).
 
 Each AppImage embeds update information
-(`gh-releases-zsync|storytold|rabicraft|latest|rabicraft-*-linux-<arch>.AppImage.zsync`), and its
+(`gh-releases-zsync|RABI46|rabicraft|latest|rabicraft-*-linux-<arch>.AppImage.zsync`, from `GITHUB_REPOSITORY`), and its
 `.zsync` is published beside it, so AppImageUpdate and AppImageLauncher can update it in place,
 downloading only the changed blocks. `latest` is the newest published, non-pre-release version.
 `package.sh` writes the `.zsync` when `zsyncmake` (the `zsync` package) is installed and warns
@@ -249,7 +249,7 @@ release does.
 ## Scanner detections
 
 Antivirus and reputation scanners sometimes flag a released file. Check the facts before you change
-code or answer publicly. The first report was [issue #747](https://github.com/storytold/pdfcraft/issues/747),
+code or answer publicly. The first report on the upstream project was [issue #747](https://github.com/storytold/pdfcraft/issues/747),
 a match of the `CobaltStrikeBeacon` family rule.
 
 1. **Confirm the file is the release.** Compare its SHA-256 with `SHA256SUMS.txt` on the GitHub
@@ -285,4 +285,5 @@ a match of the `CobaltStrikeBeacon` family rule.
    nothing about the software.
 7. **Report.** To the scanner, send the file's SHA-256, the release URL, the rule name and revision,
    and the matched identifiers and offsets. Report RabiCraft problems at
-   <https://github.com/storytold/pdfcraft/issues> with the same facts.
+   <https://github.com/RABI46/rabicraft/issues> with the same facts. (The upstream project takes
+   PdfCraft reports; this fork does not ship PdfCraft's releases.)

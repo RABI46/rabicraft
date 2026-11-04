@@ -7,7 +7,9 @@
 
 use std::collections::HashSet;
 
-use rabicraft_cos::page_labels::{MAX_LABEL_BYTES, MAX_LABEL_TREE_DEPTH, MAX_LABEL_TREE_WORK, MAX_PREFIX_BYTES, MAX_PREFIX_TOTAL_BYTES, alpha, roman};
+use rabicraft_cos::page_labels::{
+    MAX_LABEL_BYTES, MAX_LABEL_TREE_DEPTH, MAX_LABEL_TREE_WORK, MAX_PREFIX_BYTES, MAX_PREFIX_TOTAL_BYTES, alpha, roman,
+};
 use rabicraft_cos::{Dict, Document, ObjRef, Object, PdfString};
 
 use crate::{OrganizeError, page_count, pages_root};

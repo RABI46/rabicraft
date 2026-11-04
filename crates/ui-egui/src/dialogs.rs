@@ -5,7 +5,7 @@ use egui::{Align, Layout};
 use crate::theme::{self, Tokens};
 use rabicraft_engine::Edit;
 
-use crate::{CloseRequest, Dialog, RabiCraftApp, PropsTab, panels::human_size, widgets};
+use crate::{CloseRequest, Dialog, PropsTab, RabiCraftApp, panels::human_size, widgets};
 
 pub(super) mod appearance;
 pub mod bookmark_styles_ui;

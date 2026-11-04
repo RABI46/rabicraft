@@ -173,7 +173,9 @@ pub fn show(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
                 });
                 ui.add_space(8.0);
                 if app.recent.is_empty() {
-                    ui.label(egui::RichText::new(tl!("Files you open in RabiCraft appear here. Drop a PDF anywhere to open it.")).color(t.text_muted));
+                    ui.label(
+                        egui::RichText::new(tl!("Files you open in RabiCraft appear here. Drop a PDF anywhere to open it.")).color(t.text_muted),
+                    );
                 }
             }
             let mut open = None;

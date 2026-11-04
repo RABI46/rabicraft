@@ -114,7 +114,7 @@ and add a line to the [progress log](#progress-log); when a gap closes, remove i
 
 | | Value | Kind |
 |---|---|---|
-| **Feature breadth** | **≈ 67%** tier-weighted (57.0% unweighted: 423 shipped + 75 partial of 808; P0 94.2%) | measured, `parity/acrobat-features.toml` |
+| **Feature breadth** | **≈ 71%** tier-weighted (54.9% unweighted: 452 shipped + 106 partial of 824 counted; P0 94.6%) | measured, `parity/acrobat-features.toml` |
 | Feature breadth, mainstream practitioner | ≈ 70% tier-weighted (63.3% unweighted; P0 95.3%) | measured ([split](docs/target-app-parity.md#mainstream-practitioner-vs-full-acrobat-pro)) |
 | **Ready for real work**, full Acrobat Pro | **≈ 50%** (45–53%) | estimated, weighted sum over [dimensions](#by-dimension) |
 | **Ready for real work**, mainstream practitioner | **≈ 55%** (50–60%) | estimated ([split](docs/target-app-parity.md#mainstream-practitioner-vs-full-acrobat-pro)) |
@@ -123,11 +123,13 @@ and add a line to the [progress log](#progress-log); when a gap closes, remove i
 | Remaining to **full parity** | ≈ 780–1,400 Opus 5.5 agent-hours (≈ 300–550 h wall clock with 3–5 agents) | estimated, calibrated on this repo's history |
 
 **Why alpha:** all six of Acrobat Pro's everyday workflows can be completed end to end on macOS
-(the [alpha gate](docs/roadmap.md#alpha-gate)), and users praise them (7.6k stars, ≈ 217k downloads
-of 0.4–0.5, switching reports such as #179). Two are only partial: editing (no CJK/RTL) and convert
-and share (no in-app Office→PDF; Word export loses layout, #773; password-protected files open in
-Acrobat since #836, #774). Those, unmeasured quality against Acrobat, the borrowed `hayro` renderer,
-and 245 open issues keep it far from beta.
+(the [alpha gate](docs/roadmap.md#alpha-gate)). Upstream PdfCraft, from which this project is
+forked, reports users praising them (7.6k stars, ≈ 217k downloads of its 0.4–0.5 releases, switching
+reports such as #179); this fork has no users of its own to cite yet, and no release published. Two
+workflows are only partial: editing (no CJK/RTL) and convert and share (no in-app Office→PDF; Word
+export loses layout, #773; password-protected files open in Acrobat since #836, #774). Those,
+unmeasured quality against Acrobat, the borrowed `hayro` renderer, and the upstream bug backlog keep
+it far from beta.
 
 ### Readiness by audience
 

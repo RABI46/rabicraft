@@ -1,5 +1,5 @@
 use super::{
-    Color32, CornerRadius, DocInfo, DocView, Edit, RabiCraftApp, Pos2, QuickTool, Rect, Sense, SnapshotKind, Stroke, Tokens, comments, icons, theme,
+    Color32, CornerRadius, DocInfo, DocView, Edit, Pos2, QuickTool, RabiCraftApp, Rect, Sense, SnapshotKind, Stroke, Tokens, comments, icons, theme,
     vec2,
 };
 

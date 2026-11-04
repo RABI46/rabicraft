@@ -828,7 +828,8 @@ fn a_jbig2_image_past_the_runs_allowance_stops_the_run() {
     let image = Stream::from_raw(dict, rabicraft_filters::encode_jbig2_generic(&[0xFF; 4], 16, 2).unwrap());
     let doc = Document::new_empty();
     let half = [[0.0, 0.0, 0.5, 1.0]];
-    let clear = |work| crate::image::clear(&doc, &image, &rabicraft_content::Matrix::IDENTITY, &half, &mut rabicraft_cos::ImageBudget::with_work(work));
+    let clear =
+        |work| crate::image::clear(&doc, &image, &rabicraft_content::Matrix::IDENTITY, &half, &mut rabicraft_cos::ImageBudget::with_work(work));
     assert!(matches!(clear(u64::MAX), Ok(Some(_))), "cleared in a copy");
     assert!(matches!(clear(0), Err(())), "it can't be cleared");
 
@@ -1136,7 +1137,8 @@ fn a_cleared_image_of_more_than_one_bit_stays_flate() {
         *b = state.to_le_bytes()[0];
     }
     let dict = format!("/Type /XObject /Subtype /Image /Width {w} /Height {h} /BitsPerComponent 8 /ColorSpace /DeviceGray /Filter /FlateDecode");
-    let mut doc = one_page(b"q 200 0 0 20 0 100 cm /Im Do Q", "/XObject << /Im 7 0 R >>", vec![stream(&dict, rabicraft_filters::encode_flate(&data))]);
+    let mut doc =
+        one_page(b"q 200 0 0 20 0 100 cm /Im Do Q", "/XObject << /Im 7 0 R >>", vec![stream(&dict, rabicraft_filters::encode_flate(&data))]);
     mark(&mut doc, 0, &[[0.0, 112.0, 99.0, 118.0]], "");
     assert_eq!(apply(&mut doc, None).unwrap().images_cleared, 1);
     let saved = Document::open(Arc::new(write_full(&doc, &SaveOptions::default()).unwrap())).unwrap();
@@ -2724,7 +2726,8 @@ fn removing_comments_keeps_annotations_that_are_not_comments() {
 #[test]
 fn overlay_text_takes_its_font_size_colour_alignment_and_repeats() {
     let mut doc = one_page(b"BT /F1 12 Tf 20 250 Td (Secret salary figures) Tj ET", "", Vec::new());
-    let look = rabicraft_annot::OverlayLook { font: rabicraft_annot::OverlayFont::Courier, size: 8.0, color: [0.0, 0.0, 1.0], align: 0, repeat: true };
+    let look =
+        rabicraft_annot::OverlayLook { font: rabicraft_annot::OverlayFont::Courier, size: 8.0, color: [0.0, 0.0, 1.0], align: 0, repeat: true };
     let shape = Shape::Redact { quads: vec![rect_quad([10.0, 200.0, 290.0, 270.0])], overlay: "REDACTED".into(), look };
     let style = Style::default_for(&shape);
     add_annotation(&mut doc, &NewAnnotation { page: 0, shape, style, contents: String::new(), author: "T".into() }, &Meta::default()).unwrap();

@@ -602,17 +602,6 @@ pub fn progress_notice(app: &RabiCraftApp, ctx: &egui::Context) -> bool {
     cancel
 }
 
-/// The RabiCraft wordmark (docs/brand/), sized to `height`.
-pub fn brand_logo(ui: &mut egui::Ui, height: f32) -> Response {
-    let dark = ui.visuals().dark_mode;
-    let (uri, bytes): (&str, &'static [u8]) = if dark {
-        ("bytes://rabicraft-logo-white.svg", include_bytes!("../../../docs/brand/rabicraft-logo-white.svg"))
-    } else {
-        ("bytes://rabicraft-logo.svg", include_bytes!("../../../docs/brand/rabicraft-logo.svg"))
-    };
-    ui.add(egui::Image::from_bytes(uri, bytes).max_height(height).alt_text("RabiCraft"))
-}
-
 /// The RabiCraft mark (works on light and dark), `size` points square.
 pub fn brand_mark(ui: &mut egui::Ui, size: f32) -> Response {
     ui.add(

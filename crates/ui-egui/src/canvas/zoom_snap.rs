@@ -7,7 +7,7 @@ use rabicraft_render::{RenderConfig, RenderRequest, RequestKind, Tile};
 use crate::canvas::{DocView, PageXform};
 use crate::page_cursor::Layer;
 use crate::page_pointer::PagePointer;
-use crate::{RabiCraftApp, QuickTool};
+use crate::{QuickTool, RabiCraftApp};
 
 /// A finished gesture: (page, the rectangle on screen, the same in page view points
 /// [x0, y0, x1, y1]); a plain click has an empty rectangle.

@@ -17,7 +17,12 @@ use anyhow::{Context, Result, bail};
 /// (file stem, title, what it shows, shot arguments after the PDF path).
 pub const SCENES: &[(&str, &str, &str, &[&str])] = &[
     ("rabicraft-viewer", "Viewer with comments", "README hero", &["--panel", "comments", "--zoom", "72"]),
-    ("rabicraft-dark", "Dark theme", "README: themes", &["--theme", "dark", "--panel", "comments", "--page", "11", "--zoom", "80", "--notice", "off"]),
+    (
+        "rabicraft-dark",
+        "Dark theme",
+        "README: themes",
+        &["--theme", "dark", "--panel", "comments", "--page", "11", "--zoom", "80", "--notice", "off"],
+    ),
     ("rabicraft-organize", "Organize pages", "README: organize", &["--organize", "on", "--panel", "none", "--select", "5,6,7"]),
     ("rabicraft-find", "Find text", "README: search", &["--find", "type", "--page", "4", "--zoom", "90", "--panel", "none", "--notice", "off"]),
     ("rabicraft-bookmarks", "Bookmarks", "README: navigation", &["--panel", "bookmarks", "--page", "7", "--zoom", "75", "--notice", "off"]),

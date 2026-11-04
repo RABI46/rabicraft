@@ -26,8 +26,8 @@
   <img alt="Platforms: macOS, Windows, Linux, FreeBSD, web" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20FreeBSD%20%C2%B7%20web-b70228?style=flat-square">
   <img alt="No account, no telemetry" src="https://img.shields.io/badge/no%20account-no%20telemetry-8a011e?style=flat-square">
   <br>
-  <a href="https://sonarcloud.io/project/overview?id=storytold_pdfcraft"><img alt="Scanned by SonarCloud" src="https://img.shields.io/badge/Scanned_by-SonarCloud-4b9fd5?style=flat-square&logo=sonarqubecloud&logoColor=white"></a>
-  <a href="https://coderabbit.ai"><img alt="Reviewed by CodeRabbit" src="https://img.shields.io/coderabbit/prs/github/storytold/pdfcraft?style=flat-square&label=Reviewed%20by%20CodeRabbit&logo=coderabbit"></a>
+  <a href="https://sonarcloud.io/project/overview?id=RABI46_rabicraft"><img alt="Scanned by SonarCloud" src="https://img.shields.io/badge/Scanned_by-SonarCloud-4b9fd5?style=flat-square&logo=sonarqubecloud&logoColor=white"></a>
+  <a href="https://coderabbit.ai"><img alt="Reviewed by CodeRabbit" src="https://img.shields.io/coderabbit/prs/github/RABI46/rabicraft?style=flat-square&label=Reviewed%20by%20CodeRabbit&logo=coderabbit"></a>
 </p>
 
 <p align="center">
@@ -351,11 +351,13 @@ RabiCraft is a Cargo workspace of focused crates, layered so the core never depe
 | `rabicraft-automation` | Agent control: the headless tool table, `rabicraft-cli run`, and the opt-in MCP server |
 | `rabicraft-ui-egui` | The desktop and web interface |
 
-**Quality gates.** Every change passes the same automated checks:
-- formatting, and Clippy with warnings as errors;
-- 200+ unit, property and UI tests;
-- crate-layering rules and a WebAssembly build check;
-- an asset-licence audit.
+**Quality gates.** `cargo xtask ci` runs the same checks on every change:
+- formatting, and Clippy over every target with warnings as errors;
+- the test suite (over 6,000 unit, property and UI tests; `cargo nextest` when installed, then the doctests), plus a check of `rabicraft-cli` without default features;
+- crate-layering rules and a WebAssembly `cargo check` over every crate below the UI layer;
+- an asset-licence audit, a dependency-licence and advisory check (`cargo-deny`), and the parity checklist (`cargo xtask parity`), which rejects a `shipped` claim whose command, tool or cited test does not exist.
+
+**Agent control.** Every user-facing feature is also reachable without the GUI: `rabicraft-cli run` and the opt-in MCP server (`rabicraft-cli mcp`) share one table of tools, confined to `--root` when given; `rabicraft --control FILE` exposes the running interface on loopback with a per-launch token.
 
 On top of those, two corpus sweeps run over real-world files:
 - **Opening and rendering:** of the 983 pdf.js test files, 963 open and render cleanly, with 0 crashes.
@@ -371,7 +373,7 @@ RabiCraft is a clean-room implementation. Its behaviour comes from the ISO 32000
 Building needs Rust 1.95 or later.
 
 ```sh
-git clone https://github.com/storytold/pdfcraft
+git clone https://github.com/RABI46/rabicraft
 cd rabicraft
 cargo xtask models                                # fetch the OCR models Scan & OCR needs (release builds include them)
 cargo run --release -p rabicraft -- some.pdf     # desktop app
@@ -395,8 +397,9 @@ git clone https://github.com/storytold/craft-fonts ../craft-fonts
 CRAFT_FONTS_DIR=../craft-fonts cargo run --release -p rabicraft -- some.pdf
 ```
 
-Each [GitHub release](https://github.com/RABI46/rabicraft/releases) has ready-made builds for macOS,
-Windows, Linux (AppImage, Flatpak, `.deb`, `.rpm` and a tarball), FreeBSD and the web; see
+The release pipeline ([docs/releasing.md](docs/releasing.md)) builds macOS, Windows, Linux
+(AppImage, Flatpak, `.deb`, `.rpm` and a tarball), FreeBSD and the web; the GitHub Releases page of
+this fork lists whatever has been published so far, and a source build always works — see
 [Downloads](#downloads). On Gentoo, the community [::snakebyte
 overlay](https://github.com/switch87/snakebyte-overlay) packages the Linux release as
 `app-text/rabicraft-bin` (not maintained by the RabiCraft team):
@@ -414,11 +417,11 @@ Logs, environment variables and other development notes are in [docs/development
 
 RabiCraft is young and moving fast. The aim is a workbench where you can view, organize, annotate, fill, sign and edit PDFs, for professional and everyday workflows.
 
-**Where it stands (October 2026), honestly:** RabiCraft is **alpha**. Most essential offline PDF features exist in some form (57% of the features tracked in [docs/target-app-parity.md](docs/target-app-parity.md), 94% of core essentials). For everyday work (viewing, commenting, filling and signing forms, organizing pages) readiness is about 55%; across all professional workflows, about 49%; for someone who only needs the essentials, about 66%. Every everyday workflow can be completed, but converting and sharing is weak: no office-document-to-PDF, and .docx export that loses layout.
+**Where it stands (November 2026), honestly:** RabiCraft is **alpha**. Most essential offline PDF features exist in some form (54.9% of the features tracked in [docs/target-app-parity.md](docs/target-app-parity.md), 94.6% of the core essentials). For everyday work (viewing, commenting, filling and signing forms, organizing pages) readiness is about 55%; across all professional workflows, about 49%; for someone who only needs the essentials, about 66%. Every everyday workflow can be completed, but converting and sharing is weak: no office-document-to-PDF, and .docx export that loses layout.
 
 - **Good today:** viewing and search; organizing, combining and splitting; most kinds of comment; filling and authoring forms (with sandboxed JavaScript); passwords, redaction and sanitizing; basic digital signatures; printing; the Accessibility Checker; agent control through the CLI and MCP.
 - **Still borrowed:** pages are drawn by the `hayro` crate while our own renderer is built.
-- **Thin or missing:** reliable editing of existing text (especially CJK and right-to-left), OCR beyond Latin script, office document import/export, signature tokens and online long-term validation, Preflight and PDF/X/UA, printing from the web build, physical printer fidelity, and full XFA forms.
+- **Thin or missing:** reliable editing of existing text (especially CJK and right-to-left), OCR beyond Latin script, office document import/export, signature tokens and online long-term validation, Preflight and PDF/X/UA, CMYK and spot-colour print accuracy, and full XFA forms.
 - **Hardening:** fuzzing still turns up crashes and hangs on hostile files; each one is fixed with a regression test. Quality has not yet been benchmarked side by side.
 
 **Next, in order:** office-document-to-PDF and a .docx export that keeps layout, the reported bugs and the Chinese interface font, a fidelity harness against a reference renderer, editing existing content, then professional workflows (OCR, office formats, Preflight, signatures, accessibility tagging) and 1.0 polish.
@@ -429,7 +432,12 @@ The summary is in **[ROADMAP.md](ROADMAP.md)**; the full assessment by dimension
 
 ## Downloads
 
-**Downloads:** on GitHub, the [latest release](https://github.com/RABI46/rabicraft/releases/latest) has every build listed below, and [all releases](https://github.com/RABI46/rabicraft/releases) has earlier versions and their notes. `<ver>` in the file names is the version number, and `SHA256SUMS.txt` lists a checksum for every file.
+This fork has not published a release yet: build it from source (see
+[Get started](#get-started)) — what `docs/releasing.md` describes is the pipeline, and the file
+names below are what it produces. Once a release is published, the [latest release](https://github.com/RABI46/rabicraft/releases/latest)
+has every build listed below and [all releases](https://github.com/RABI46/rabicraft/releases) has
+earlier versions and their notes; `<ver>` in the file names is the version number, and
+`SHA256SUMS.txt` lists a checksum for every file.
 
 ### Windows
 
@@ -477,11 +485,13 @@ MSI of the same version replace the installed one without asking. Two different 
 be told apart by version, so if your deployment tool checks the file, pin its SHA-256 from
 `SHA256SUMS.txt` (`Get-FileHash <file> -Algorithm SHA256`).
 
-**Signing identities.** The Windows MSIs and both executables are signed through Azure Trusted
-Signing with a certificate issued to `Learning Machines Inc` (Atlanta, Georgia, US). The macOS app
-and command-line tool are signed with the Developer ID `Learning Machines LLC (DJ6XS33FX8)` and
-notarized. The MSI's manufacturer, shown as the publisher in Installed apps, is
-`Learning Machines LLC`.
+**Signing identities.** The release pipeline signs Windows builds through Azure Trusted Signing and
+macOS builds with a Developer ID, from the secrets listed in
+[docs/releasing.md](docs/releasing.md). This fork publishes no signed build yet: until it has its own
+certificates, a Windows or macOS artifact it produces is unsigned and the workflow says so with a
+`::warning::`. (Upstream PdfCraft's installers are signed by `Learning Machines`; those signatures
+say nothing about this fork's binaries.) The MSI's manufacturer, shown as the publisher in Installed
+apps, is `RabiCraft contributors`.
 
 ### macOS
 

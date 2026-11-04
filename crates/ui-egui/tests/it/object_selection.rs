@@ -380,7 +380,8 @@ fn modifier_selection_picks_foreground_text_and_added_items_over_background_artw
     let after = objects(&h);
     for old in before {
         let new = after.iter().find(|o| o.target == old.target).unwrap();
-        let stationary = old.text.as_deref() == Some("Keep here") || (old.target.kind == rabicraft_engine::ObjectKind::Image && old.target.index == 0);
+        let stationary =
+            old.text.as_deref() == Some("Keep here") || (old.target.kind == rabicraft_engine::ObjectKind::Image && old.target.index == 0);
         let shift = if stationary { [0.0, 0.0] } else { [25.0, -30.0] };
         assert!(new.rect.iter().enumerate().all(|(i, value)| (value - old.rect[i] - shift[i % 2]).abs() < 0.01), "{old:?} -> {new:?}");
     }

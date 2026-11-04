@@ -1797,7 +1797,9 @@ fn owner_password_of_older_revisions_opens_the_viewer_too() {
 /// renderer takes: the recovered user password for an R2–R4 owner password, else as given.
 #[test]
 fn render_password_for_recovers_the_user_password_of_older_revisions() {
-    for alg in [rabicraft_cos::Algorithm::Rc4_40, rabicraft_cos::Algorithm::Rc4_128, rabicraft_cos::Algorithm::Aes128, rabicraft_cos::Algorithm::Aes256] {
+    for alg in
+        [rabicraft_cos::Algorithm::Rc4_40, rabicraft_cos::Algorithm::Rc4_128, rabicraft_cos::Algorithm::Aes128, rabicraft_cos::Algorithm::Aes256]
+    {
         let mut doc = rabicraft_cos::Document::open(Arc::new(fixture(1))).unwrap();
         doc.set_encryption(&rabicraft_cos::NewEncryption {
             algorithm: alg,

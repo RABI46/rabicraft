@@ -1820,8 +1820,10 @@ fn images_and_text_files_join_the_combine_list_as_pdfs() {
     let mut png = std::io::Cursor::new(Vec::new());
     image::RgbImage::from_pixel(40, 20, image::Rgb([90, 120, 200])).write_to(&mut png, image::ImageFormat::Png).unwrap();
     let mut h = combine_of(&[("one.pdf", 2)]);
-    h.state_mut()
-        .use_files(rabicraft_ui_egui::FilePurpose::Combine, vec![("scan.png".into(), png.into_inner()), ("notes.txt".into(), b"Some notes".to_vec())]);
+    h.state_mut().use_files(
+        rabicraft_ui_egui::FilePurpose::Combine,
+        vec![("scan.png".into(), png.into_inner()), ("notes.txt".into(), b"Some notes".to_vec())],
+    );
     h.run_steps(3);
     assert_eq!(combine_names(&h), ["one.pdf", "scan.png", "notes.txt"]);
     let draft = &h.state().combine_draft;
