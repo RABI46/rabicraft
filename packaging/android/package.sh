@@ -46,7 +46,7 @@ if [[ -x ./gradlew ]]; then
   ./gradlew --no-daemon :app:assembleRelease
 else
   command -v gradle >/dev/null || { echo "error: gradle not found (or commit the wrapper: gradle wrapper)" >&2; exit 1; }
-  gradle --no-daemon --offline=false :app:assembleRelease
+  gradle --no-daemon :app:assembleRelease
 fi
 BUILT="$APP/build/outputs/apk/release/app-release.apk"
 [[ -f "$BUILT" ]] || { echo "error: $BUILT missing" >&2; exit 1; }
