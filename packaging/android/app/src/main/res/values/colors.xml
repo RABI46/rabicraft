@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- assets/app-icon/rabicraft.svg's background, so the icon matches the other packages. -->
+    <color name="ic_launcher_background">#B70228</color>
+</resources>

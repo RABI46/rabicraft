@@ -1,0 +1,6 @@
+# Gradle's own output, and the trunk build copied in by package.sh: both are generated.
+.gradle/
+build/
+app/build/
+local.properties
+app/src/main/assets/web/

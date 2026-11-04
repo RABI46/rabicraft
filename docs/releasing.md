@@ -1,7 +1,7 @@
 # Releasing RabiCraft
 
 Every push to the `release` branch runs `.github/workflows/release.yml`. It builds installers for
-macOS, Windows, Linux, FreeBSD and the web, signs the ones it has certificates for, and creates or
+macOS, Windows, Linux, FreeBSD, the web and Android, signs the ones it has certificates for, and creates or
 updates a **draft** GitHub Release named `RabiCraft v<version>`. Nobody sees a draft until a
 maintainer publishes it.
 
@@ -55,6 +55,7 @@ published (`gh workflow run release.yml --ref <branch>`).
 | Flatpak aarch64 | `rabicraft-<v>-linux-aarch64.flatpak` | `ubuntu-24.04-arm` (repackages the Linux tarball) |
 | FreeBSD 14 x86_64 | `rabicraft-<v>-freebsd-x86_64.tar.gz` | FreeBSD VM on `ubuntu-latest` |
 | Web | `rabicraft-web-<v>.zip` (a static site; see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
+| Android 8+ | `rabicraft-<v>-android.apk` (the web build in a WebView; side-loaded, no store; see [`packaging/android/README.md`](../packaging/android/README.md)) | `ubuntu-24.04` (`.github/workflows/android.yml`) |
 
 The ARM64 Windows build is cross-compiled on the x64 runner, so signing and WiX work as for the
 other Windows builds; `.github/workflows/windows-arm64.yml` installs and runs it on ARM64 hardware.
