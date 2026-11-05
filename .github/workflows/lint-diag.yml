@@ -1,0 +1,72 @@
+name: Lint diag
+
+# TEMPORARY: `lint / lint` fails and a job's log cannot be read back from outside the run. This
+# repeats the checks the shared packaging lint runs, one step at a time, and posts what each said on
+# the pull request. Deleted once the lint is green.
+on:
+  pull_request:
+    paths: ["packaging/**", ".github/workflows/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  diag:
+    name: lint diag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the tools the shared lint installs
+        run: |
+          set -x
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends shellcheck desktop-file-utils appstream libxml2-utils python3-yaml
+          curl --proto '=https' --proto-redir =https -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          tar -xz -C "$RUNNER_TEMP" -f "$RUNNER_TEMP/actionlint.tar.gz" actionlint
+      - name: actionlint
+        if: always()
+        run: |
+          { "$RUNNER_TEMP/actionlint" -color=never; echo "exit=$?"; } > "$RUNNER_TEMP/actionlint.txt" 2>&1 || true
+      - name: shellcheck
+        if: always()
+        run: |
+          set +e
+          find packaging -type f -name "*.sh" -print0 | xargs -0 shellcheck > "$RUNNER_TEMP/shellcheck.txt" 2>&1
+          echo "exit=$?" >> "$RUNNER_TEMP/shellcheck.txt"
+      - name: XML and desktop entries
+        if: always()
+        run: |
+          set +e
+          {
+            for f in packaging/windows/*.wxs packaging/windows/*.wxl packaging/macos/*.plist* packaging/linux/*.xml*; do
+              [ -e "$f" ] || continue
+              xmllint --noout "$f" || echo "xmllint failed: $f"
+            done
+            for f in packaging/linux/*.desktop; do
+              [ -e "$f" ] || continue
+              desktop-file-validate "$f" || echo "desktop-file-validate failed: $f"
+            done
+            echo "done"
+          } > "$RUNNER_TEMP/xml.txt" 2>&1
+      - name: Report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          {
+            echo "### lint diag"
+            for f in "$RUNNER_TEMP"/actionlint.txt "$RUNNER_TEMP"/shellcheck.txt "$RUNNER_TEMP"/xml.txt; do
+              [ -f "$f" ] || continue
+              printf '\n<details><summary>%s</summary>\n\n```\n' "$(basename "$f")"
+              head -60 "$f"
+              printf '```\n\n</details>\n'
+            done
+          } > "$RUNNER_TEMP/report.md"
+          if [ -n "${PR:-}" ]; then gh pr comment "$PR" --body-file "$RUNNER_TEMP/report.md"; else cat "$RUNNER_TEMP/report.md"; fi
