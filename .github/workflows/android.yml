@@ -24,8 +24,6 @@ on:
 
 permissions:
   contents: read
-  # Only for the temporary failure report at the end of the job (see "Report a failure").
-  pull-requests: write
 
 # A newer push to a PR branch cancels its older run.
 concurrency:
@@ -81,24 +79,17 @@ jobs:
           key: android
       - name: Build the APK
         run: |
-          set +e
-          packaging/android/package.sh > "$RUNNER_TEMP/build.log" 2>&1
-          rc=$?
-          sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/build.log" > "$RUNNER_TEMP/build.txt"
-          tail -30 "$RUNNER_TEMP/build.txt"
-          [ "$rc" -eq 0 ] || exit "$rc"
+          set -euo pipefail
+          packaging/android/package.sh
           # The page inside the APK must be the browser build, not an empty folder.
           unzip -l dist/release/rabicraft-*-android.apk | grep -q 'assets/web/index.html'
       - name: Test the host page
-        run: |
-          set +e
+        run: |-
+          set -euo pipefail
           # The Kotlin tests pin the messages the page exchanges with apps/rabicraft-web's host
           # module, and the MIME types the browser build needs.
-          (cd packaging/android && gradle --no-daemon :app:testDebugUnitTest) > "$RUNNER_TEMP/test.log" 2>&1
-          rc=$?
-          sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/test.log" > "$RUNNER_TEMP/test.txt"
-          tail -30 "$RUNNER_TEMP/test.txt"
-          exit "$rc"
+          cd packaging/android
+          gradle --no-daemon :app:testDebugUnitTest
       - name: Check the signature a phone will show
         run: |
           set -euo pipefail
@@ -111,37 +102,3 @@ jobs:
           path: dist/release/rabicraft-*-android.apk
           if-no-files-found: error
           retention-days: 30
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        # A job's log cannot always be read back from outside the run; these can.
-        if: failure()
-        with:
-          name: android-logs
-          path: |
-            ${{ runner.temp }}/build.txt
-            ${{ runner.temp }}/test.txt
-          if-no-files-found: ignore
-          retention-days: 5
-      - name: Report a failure
-        # TEMPORARY: the failing step's output, where it can be read. Removed once green.
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -uo pipefail
-          {
-            echo "Android job failed."
-            for log in "$RUNNER_TEMP/build.txt" "$RUNNER_TEMP/test.txt"; do
-              [ -f "$log" ] || continue
-              printf '\n<details><summary>%s</summary>\n\n```\n' "$(basename "$log")"
-              grep -E 'error|FAILED|FAILURE|What went wrong|Caused by|^e: |^\* ' "$log" | tail -40 || true
-              printf '```\n\n```\n'
-              tail -25 "$log"
-              printf '```\n\n</details>\n'
-            done
-          } > "$RUNNER_TEMP/report.md"
-          if [ -n "${PR:-}" ]; then
-            gh pr comment "$PR" --body-file "$RUNNER_TEMP/report.md"
-          else
-            cat "$RUNNER_TEMP/report.md"
-          fi
