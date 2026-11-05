@@ -35,5 +35,24 @@ internal fun cacheHeaders(path: String): MutableMap<String, String> =
 internal fun reply(status: Int, type: String, body: ByteArray): WebResourceResponse =
     WebResourceResponse(type, "utf-8", status, if (status == 200) "OK" else "Error", mutableMapOf(), ByteArrayInputStream(body))
 
-/** A JavaScript string literal, quoted for `WebView.evaluateJavascript`. */
-internal fun js(text: String): String = org.json.JSONObject.quote(text)
+/**
+ * A JavaScript string literal, for `WebView.evaluateJavascript`. Written here rather than with
+ * `org.json.JSONObject.quote`, whose Android class is an empty stub in a JVM unit test.
+ */
+internal fun js(text: String): String {
+    val out = StringBuilder(text.length + 2)
+    out.append('"')
+    for (c in text) {
+        when {
+            c == '"' -> out.append("\\\"")
+            c == '\\' -> out.append("\\\\")
+            c == '\n' -> out.append("\\n")
+            c == '\r' -> out.append("\\r")
+            c == '\t' -> out.append("\\t")
+            c < ' ' -> out.append("\\u%04x".format(c.code))
+            else -> out.append(c)
+        }
+    }
+    out.append('"')
+    return out.toString()
+}
