@@ -31,7 +31,7 @@ jobs:
       - name: actionlint
         if: always()
         run: |
-          { "$RUNNER_TEMP/actionlint" -color=never; echo "exit=$?"; } > "$RUNNER_TEMP/actionlint.txt" 2>&1 || true
+          { "$RUNNER_TEMP/actionlint" -no-color; echo "exit=$?"; } > "$RUNNER_TEMP/actionlint.txt" 2>&1 || true
       - name: shellcheck
         if: always()
         run: |
