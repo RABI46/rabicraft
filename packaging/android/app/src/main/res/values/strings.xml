@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RabiCraft</string>
+    <string name="opening">Opening RabiCraft…</string>
+    <string name="open_failed">Couldn\'t open %1$s: %2$s</string>
+    <string name="save_failed">Couldn\'t save %1$s: %2$s</string>
+    <string name="storage_refused">the Downloads folder refused the file</string>
+    <string name="saved">Saved to %1$s</string>
+    <string name="start_failed">RabiCraft couldn\'t start: %1$s</string>
+    <string name="unsaved">This document has unsaved changes. Leave without saving?</string>
+    <string name="discard">Leave</string>
+</resources>

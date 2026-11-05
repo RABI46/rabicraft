@@ -19,7 +19,7 @@ in the product or the build.
 |---|---|
 | `apps/rabicraft` | The desktop app (macOS, Windows, Linux, FreeBSD): eframe/egui on wgpu, single instance, Apple events, update check on request |
 | `apps/rabicraft-cli` | `inspect`, `edit`, `combine`, `extract`, `split`, `run` (any automation tool or a JSON script), `tools`, `ui` (drive the running app), and the opt-in `mcp` server |
-| `apps/rabicraft-web` | The same egui shell compiled to WebAssembly |
+| `apps/rabicraft-web` | The same egui shell compiled to WebAssembly; served as a static site and framed by the Android APK (`packaging/android`) |
 
 ## Layers
 

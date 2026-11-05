@@ -17,13 +17,13 @@
 <p align="center">
   <b>The PDF workbench; an open-source, modern PDF reader and editor, built in pure Rust.</b><br>
   Read, organize, combine, split and secure PDFs in a fast, native app, written in Rust from the ground up.<br>
-  macOS · Windows · Linux · FreeBSD · the web
+  macOS · Windows · Linux · FreeBSD · the web · Android
 </p>
 
 <p align="center">
   <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-b70228?style=flat-square">
   <img alt="Written in Rust" src="https://img.shields.io/badge/written%20in-Rust-8a011e?style=flat-square">
-  <img alt="Platforms: macOS, Windows, Linux, FreeBSD, web" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20FreeBSD%20%C2%B7%20web-b70228?style=flat-square">
+  <img alt="Platforms: macOS, Windows, Linux, FreeBSD, web, Android" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20FreeBSD%20%C2%B7%20web%20%C2%B7%20Android-b70228?style=flat-square">
   <img alt="No account, no telemetry" src="https://img.shields.io/badge/no%20account-no%20telemetry-8a011e?style=flat-square">
   <br>
   <a href="https://sonarcloud.io/project/overview?id=RABI46_rabicraft"><img alt="Scanned by SonarCloud" src="https://img.shields.io/badge/Scanned_by-SonarCloud-4b9fd5?style=flat-square&logo=sonarqubecloud&logoColor=white"></a>
@@ -258,7 +258,7 @@ Press <kbd>⌘K</kbd> to search every tool and command, or browse the **All tool
 
 ## Runs everywhere, stays yours
 
-- **Native on macOS, Windows, Linux and FreeBSD**, and **in the browser** through WebAssembly, from the same Rust codebase. Windows builds come for x64, x86 and ARM64 (Windows on ARM, no emulation); every ARM64 change is tested on ARM64 hardware in CI.
+- **Native on macOS, Windows, Linux and FreeBSD**, **in the browser** through WebAssembly, and on **Android** as a side-loadable APK (no store) that wraps that same web build, from one Rust codebase. Windows builds come for x64, x86 and ARM64 (Windows on ARM, no emulation); every ARM64 change is tested on ARM64 hardware in CI.
 - **Private by design.** Documents never leave your machine. There's no account, no telemetry and no cloud processing.
 - **Engine first.** Parsing, rendering and editing live in reusable library crates. The interface is one swappable layer on top.
 - **Scriptable.** The `rabicraft-cli` tool (see [Built for agents, too](#built-for-agents-too)) covers inspecting, rendering, extracting text, editing, combining, extracting pages and splitting. Robustness sweeps run on the same engine as the app.
@@ -526,6 +526,17 @@ Every other Linux build needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fe
 | Build | File | Notes |
 |---|---|---|
 | Static site | `rabicraft-web-<ver>.zip` | Runs in a modern browser; host it on any static server |
+
+### Android
+
+| Build | File | Notes |
+|---|---|---|
+| Side-loadable APK | `rabicraft-<ver>-android.apk` | Android 8+; no Play Store and no account. Open the file, allow installs from that app, install. The web build in a WebView, saving to `Downloads/RabiCraft`; how it is built and signed: [packaging/android/README.md](packaging/android/README.md) |
+
+The APK is also attached to every [workflow run](https://github.com/RABI46/rabicraft/actions/workflows/android.yml)
+of the Android build, so a newer one can be installed before a release is published. It is signed
+with the standard Android debug key, which is what lets it install without a store: a build signed
+with another key cannot update it.
 
 ---
 
