@@ -317,10 +317,15 @@ impl RabiCraftApp {
                 self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| app.ocr_files_into(files, settings, dir));
             }
         }
-        // A host page takes each searchable copy itself; a browser downloads it.
+        // A host page takes each searchable copy itself; a browser downloads it. The sink moves
+        // out of the app for the call: the batch runs inside it on the web.
         #[cfg(target_arch = "wasm32")]
-        let host = self.host_download.as_ref();
-        self.ocr_files_into(files, settings, host);
+        let host = self.host_download.take();
+        self.ocr_files_into(files, settings, host.as_ref());
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.host_download = host;
+        }
     }
 
     /// [`Self::ocr_files`] once the folder for the searchable files is known.

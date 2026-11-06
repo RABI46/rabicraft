@@ -286,6 +286,8 @@ impl RabiCraftApp {
                 }
             };
             let msg = run(ExportTask { src, kind, dpi, format, min_side, pages, stem, status: &status, lang: crate::i18n::current() }, &mut sink);
+            // The export is done with the app: the sink's borrow of it ends here.
+            drop(sink);
             if let Ok(mut s) = status.lock() {
                 *s = Some((0, 0, Some(msg)));
             }

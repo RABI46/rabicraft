@@ -81,10 +81,16 @@ impl RabiCraftApp {
                 self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| app.run_action_into(action, files, dir));
             }
         }
-        // A host page takes each result itself (`host_download`); a browser downloads it.
+        // A host page takes each result itself (`host_download`); a browser downloads it. The sink
+        // moves out of the app for the call: the batch runs inside it on the web, and borrowing
+        // the field would borrow `self` twice.
         #[cfg(target_arch = "wasm32")]
-        let host = self.host_download.as_ref();
-        self.run_action_into(action, files, host);
+        let host = self.host_download.take();
+        self.run_action_into(action, files, host.as_ref());
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.host_download = host;
+        }
     }
 
     /// [`Self::run_action_on`] once the folder for the results is known.

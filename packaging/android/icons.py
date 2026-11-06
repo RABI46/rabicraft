@@ -198,13 +198,13 @@ def main():
         target = RES / name
         text = drawable(density, viewport, INSET, SVG)
         if args.check:
-            current = (RES / "values/colors.xml").read_text(encoding="utf-8") if (RES / "values/colors.xml").is_file() else ""
-            if f">{background()}<" not in current:
-                die("res/values/colors.xml no longer holds the master's background colour: run packaging/android/icons.py")
-            continue
-        if args.check:
             if not target.is_file() or target.read_text(encoding="utf-8") != text:
                 die(f"{target.relative_to(ROOT)} is out of date: run packaging/android/icons.py")
+            # The background went to the adaptive icon's own layer, from this master: a colour
+            # that drifted from it would show as a seam at the launcher's mask.
+            colors = RES / "values/colors.xml"
+            if not colors.is_file() or f">{background()}<" not in colors.read_text(encoding="utf-8"):
+                die("res/values/colors.xml no longer holds the master's background colour: run packaging/android/icons.py")
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text, encoding="utf-8")
