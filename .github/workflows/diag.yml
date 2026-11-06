@@ -2,39 +2,45 @@ name: Diag
 on: pull_request
 permissions:
   contents: read
+concurrency:
+  group: diag-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  fmt:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - name: fmt
-        run: |
-          cargo fmt --all -- --check > /tmp/fmt.txt 2>&1 || true
-          python3 - <<'PY'
-          lines = [l for l in open('/tmp/fmt.txt').read().splitlines() if l.strip()]
-          for l in lines[:45]:
-              msg = l.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
-              print(f"::error title=fmt::{msg[:1000]}")
-          print(f"::error title=fmt-total::total lines {len(lines)}")
-          PY
-  native:
+  clippy:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
       - name: apt
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev
-      - name: tests compile
+      - name: clippy wasm
         run: |
-          cargo check -p rabicraft-ui-egui --all-targets --message-format short > /tmp/native.txt 2>&1 || true
+          cargo clippy -p rabicraft-ui-egui -p rabicraft-web --target wasm32-unknown-unknown --all-targets --message-format short > /tmp/c1.txt 2>&1 || true
           python3 - <<'PY'
-          lines = [l for l in open('/tmp/native.txt').read().splitlines() if ': error' in l or l.startswith('error')]
-          for l in lines[:45]:
-              print(f"::error title=native::{l.replace('%','%25')[:1000]}")
-          print(f"::error title=native-total::total errors {len(lines)}")
+          lines = [l for l in open('/tmp/c1.txt').read().splitlines() if ': error' in l or l.startswith('error')]
+          for l in lines[:30]:
+              print(f"::error title=clippy-wasm::{l.replace('%','%25')[:1000]}")
+          print(f"::error title=clippy-wasm-total::total {len(lines)}")
+          PY
+      - name: clippy native
+        run: |
+          cargo clippy -p rabicraft-ui-egui --all-targets --message-format short > /tmp/c2.txt 2>&1 || true
+          python3 - <<'PY'
+          lines = [l for l in open('/tmp/c2.txt').read().splitlines() if ': error' in l or l.startswith('error')]
+          for l in lines[:30]:
+              print(f"::error title=clippy-native::{l.replace('%','%25')[:1000]}")
+          print(f"::error title=clippy-native-total::total {len(lines)}")
+          PY
+      - name: phone layout test
+        run: |
+          cargo test -p rabicraft-ui-egui --test it -- compact i18n > /tmp/t.txt 2>&1 || true
+          python3 - <<'PY'
+          lines = open('/tmp/t.txt').read().splitlines()
+          keep = [l for l in lines if 'panicked' in l or l.startswith('test ') and 'FAILED' in l or l.startswith('failures:') or l.strip().startswith('assert') or 'left:' in l or 'right:' in l or l.startswith('error[') or l.startswith('test result')]
+          for l in keep[:40]:
+              print(f"::error title=test::{l.replace('%','%25')[:1000]}")
           PY
