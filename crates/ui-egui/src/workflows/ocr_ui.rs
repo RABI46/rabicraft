@@ -317,12 +317,21 @@ impl RabiCraftApp {
                 self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| app.ocr_files_into(files, settings, dir));
             }
         }
+        // A host page takes each searchable copy itself; a browser downloads it.
         #[cfg(target_arch = "wasm32")]
-        self.ocr_files_into(files, settings);
+        let host = self.host_download.as_ref();
+        self.ocr_files_into(files, settings, host);
     }
 
     /// [`Self::ocr_files`] once the folder for the searchable files is known.
-    fn ocr_files_into(&mut self, files: Vec<(String, Vec<u8>)>, settings: OcrSettings, #[cfg(not(target_arch = "wasm32"))] dir: std::path::PathBuf) {
+    fn ocr_files_into(
+        &mut self,
+        files: Vec<(String, Vec<u8>)>,
+        settings: OcrSettings,
+        #[cfg(not(target_arch = "wasm32"))] dir: std::path::PathBuf,
+        // The page's own file sink: an `<a download>` reaches nothing in a WebView.
+        #[cfg(target_arch = "wasm32")] host: Option<&crate::HostSaveFn>,
+    ) {
         // Another batch may have started while the folder picker was open.
         if self.ocr_batch.is_some() {
             self.notify_tr("Text recognition is already running");
@@ -338,7 +347,7 @@ impl RabiCraftApp {
             #[cfg(not(target_arch = "wasm32"))]
             let summary = rabicraft_engine::guard(|| recognize_files(files, &settings, &p, &dir));
             #[cfg(target_arch = "wasm32")]
-            let summary = rabicraft_engine::guard(|| recognize_files(files, &settings, &p));
+            let summary = rabicraft_engine::guard(|| recognize_files(files, &settings, &p, host));
             let summary = summary.unwrap_or_else(|panic| failed(&panic));
             if let Ok(mut s) = p.lock() {
                 s.done = s.total;
@@ -364,6 +373,7 @@ fn recognize_files(
     settings: &OcrSettings,
     p: &Mutex<BatchProgress>,
     #[cfg(not(target_arch = "wasm32"))] dir: &std::path::Path,
+    #[cfg(target_arch = "wasm32")] host: Option<&crate::HostSaveFn>,
 ) -> String {
     let (mut ok, mut words, mut failed) = (0, 0, Vec::new());
     match rabicraft_engine::ocr::engine() {
@@ -377,8 +387,9 @@ fn recognize_files(
                 let saved = r.and_then(|r| {
                     #[cfg(not(target_arch = "wasm32"))]
                     crate::editing::write_atomically(&dir.join(&name).to_string_lossy(), &r.bytes).map_err(|e| e.to_string())?;
+                    // A host page takes the file itself; a plain browser downloads it.
                     #[cfg(target_arch = "wasm32")]
-                    crate::editing::download(&name, &r.bytes)?;
+                    crate::editing::download_with(host, &name, &r.bytes)?;
                     Ok(r.words())
                 });
                 match saved {

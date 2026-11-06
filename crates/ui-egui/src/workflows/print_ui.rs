@@ -526,7 +526,7 @@ impl RabiCraftApp {
         };
         let stem = name.trim_end_matches(".pdf").trim_end_matches(".PDF");
         let file = format!("{stem} (print).pdf");
-        match crate::editing::download(&file, &pdf) {
+        match crate::editing::download_with(self.host_download.as_ref(), &file, &pdf) {
             Ok(()) => self.notify_fmt("Couldn't print from the browser ({e}); downloaded {name} to print instead", &[("e", error), ("name", &file)]),
             Err(_) => self.notify_error(error),
         }
@@ -565,9 +565,12 @@ impl RabiCraftApp {
     fn save_print_pdf(&mut self, name: &str, bytes: Vec<u8>) -> bool {
         let stem = name.trim_end_matches(".pdf").trim_end_matches(".PDF");
         let file = format!("{stem} (print).pdf");
-        match crate::editing::download(&file, &bytes) {
+        match crate::editing::download_with(self.host_download.as_ref(), &file, &bytes) {
             Ok(()) => {
-                self.notify_fmt("Downloaded {name}", &[("name", &file)]);
+                // A host page says where it put the file; the browser's download needs saying.
+                if self.host_download.is_none() {
+                    self.notify_fmt("Downloaded {name}", &[("name", &file)]);
+                }
                 true
             }
             Err(e) => {

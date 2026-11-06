@@ -16,12 +16,14 @@ class HostPageTest {
 
     @Test
     fun the_frame_is_the_browser_build_asked_to_be_a_framed_page() {
-        // Without ?host=parent the frame downloads its saves instead of posting them here.
-        assertTrue(page.contains("/index.html?host=parent"))
+        // Without ?host=parent the frame downloads its saves instead of posting them here; the
+        // phone asks for the compact chrome, or the menus come out as a row of "⋯".
+        assertTrue(page.contains("/index.html?host=parent&compact=1"))
         // package.sh copies trunk's output to the root of assets/web, so the site sits next to
         // host.html. A frame pointed anywhere else is an empty window and no error at all: that
         // shipped once, with ./app/index.html.
-        assertEquals("./index.html?host=parent", HostPage.FRAME)
+        assertEquals("./index.html?host=parent&compact=1", HostPage.FRAME)
+        assertTrue("a phone asks for the phone layout", HostPage.FRAME.contains("compact=1"))
         // Every message must be addressed to the frame's origin: postMessage with "*" would let
         // any navigated frame read the documents the user hands over.
         assertFalse("a wildcard postMessage target", page.contains(", '*')"))
@@ -43,6 +45,17 @@ class HostPageTest {
         assertTrue(page.contains("data.bytes"))
         // Dirty messages carry `dirty`.
         assertTrue(page.contains("data.dirty"))
+    }
+
+    @Test
+    fun the_files_button_reaches_the_app() {
+        // The app's Files sheet is native: the page must not try to read anything (a WebView has
+        // no filesystem), only ask for it. `#files` sits over the app's one bar.
+        assertTrue(page.contains("id=\"files\""))
+        assertTrue(page.contains("window.RabiCraftAndroid.files()"))
+        // And the app's answer goes back through the same message the frame already speaks: a
+        // document is handed over with rabicraft:open, queued until the frame is ready.
+        assertTrue(page.contains("rabicraft:open"))
     }
 
     @Test

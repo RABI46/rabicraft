@@ -78,7 +78,7 @@ impl RabiCraftApp {
             #[cfg(target_arch = "wasm32")]
             let result = {
                 let _ = target;
-                crate::editing::download(&filename, &pdf)
+                crate::editing::download_with(app.host_download.as_ref(), &filename, &pdf)
             };
             match result {
                 Ok(()) => made += 1,

@@ -51,6 +51,10 @@ pub fn parse(value: &str) -> Result<Option<f32>, String> {
     valid(percent / 100.0).map(Some).ok_or_else(|| format!("ui-scale must be between {}% and {}%", (MIN * 100.0).round(), (MAX * 100.0).round()))
 }
 
+/// The interface size a phone draws at when the user has not chosen one: comfortably larger than
+/// a desktop's, for a screen held at arm's length (#1661).
+pub const PHONE: f32 = 1.15;
+
 /// The percentage a factor shows as.
 pub fn percent(factor: f32) -> u32 {
     // In MIN..=MAX (every factor here went through `valid`, or is 1.0), so the cast can't overflow.

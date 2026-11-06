@@ -43,7 +43,7 @@ def main():
     if not target.is_file():
         print(f"check-page: the host page frames {frame!r}, but {target} does not exist", file=sys.stderr)
         return 1
-    if "?host=parent" not in frame:
+    if "host=parent" not in frame:
         print(f"check-page: {frame!r} does not ask for ?host=parent: saves would download instead of reaching the app", file=sys.stderr)
         return 1
     # The page needs a canvas for the renderer, and trunk writes the wasm next to it.

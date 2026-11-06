@@ -787,7 +787,7 @@ impl RabiCraftApp {
         {
             let _ = title;
             for (name, bytes) in &named {
-                if let Err(e) = crate::editing::download(name, bytes) {
+                if let Err(e) = crate::editing::download_with(self.host_download.as_ref(), name, bytes) {
                     self.notify_fmt("Couldn't download {name}: {e}", &[("name", name), ("e", &e.to_string())]);
                     return;
                 }
@@ -979,7 +979,7 @@ impl RabiCraftApp {
             }
         }
         #[cfg(target_arch = "wasm32")]
-        if let Err(e) = crate::editing::download(&format!("{stem}.{ext}"), &bytes) {
+        if let Err(e) = crate::editing::download_with(self.host_download.as_ref(), &format!("{stem}.{ext}"), &bytes) {
             self.notify_error(e);
         }
     }
@@ -1043,7 +1043,7 @@ impl RabiCraftApp {
             }
         }
         #[cfg(target_arch = "wasm32")]
-        let _ = crate::editing::download("report.csv", csv.as_bytes());
+        let _ = crate::editing::download_with(self.host_download.as_ref(), "report.csv", csv.as_bytes());
     }
 
     pub fn export_data_dialog(&mut self, comments: bool, fields: bool) {
@@ -1104,7 +1104,7 @@ impl RabiCraftApp {
         #[cfg(target_arch = "wasm32")]
         match self.session.export_data(id, rabicraft_engine::DataFormat::Xfdf, comments, fields) {
             Ok(bytes) => {
-                let _ = crate::editing::download(&format!("{stem}.xfdf"), &bytes);
+                let _ = crate::editing::download_with(self.host_download.as_ref(), &format!("{stem}.xfdf"), &bytes);
             }
             Err(e) => self.notify_error(e),
         }

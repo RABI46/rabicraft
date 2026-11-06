@@ -415,8 +415,49 @@ fn keep_resize_edges_off_scrollbars(ui: &mut egui::Ui, host: egui::Id, open: &[P
     }
 }
 
+/// The phone's panes: the tools, over the page, in a sheet the menu opens; the rail and the side
+/// pane are left out, because a phone-wide screen has no room beside a page. The rail's own
+/// commands (zoom, rotate, page) keep their menu entries and their keys, and the page takes a
+/// pinch and a two-finger scroll as it always did. Returns nothing: the panes stay open until the
+/// user closes them, as a modal drawer does.
+pub fn show_compact(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
+    let open = open_panes(app);
+    if open.is_empty() {
+        return;
+    }
+    let t = crate::theme::Tokens::get(ui.ctx());
+    let width = (ui.available_width() * 0.86).min(crate::chrome::COMPACT_PANE);
+    egui::SidePanel::right("compact_pane")
+        .exact_width(width)
+        .resizable(false)
+        .frame(egui::Frame::NONE.fill(t.panel).inner_margin(egui::Margin::ZERO))
+        .show_inside(ui, |ui| {
+            let panels = app.side_panels;
+            let labels = PaneLabels { resize: crate::i18n::t("Resize panels").to_owned(), ..PaneLabels::default() };
+            let output = PaneHost::new(egui::Id::unique("rabicraft-compact-pane"))
+                .policy(SidePolicy::Columns)
+                .f6(false)
+                .labels(labels)
+                .frame(egui::Frame::NONE.fill(t.panel))
+                .body_margin(egui::Margin::ZERO)
+                .show(ui, &open, |pane| Some(state_of(&panels, *pane)), &mut Content { app });
+            for request in output.requests {
+                match request {
+                    PaneRequest::Resize(pane, width) => app.side_panels.set_width(pane, width),
+                    PaneRequest::Close(Pane::Tools) => app.left_open = false,
+                    PaneRequest::Close(Pane::Side) => app.choose_right_panel(None),
+                    _ => {}
+                }
+            }
+        });
+}
+
 /// Draws the rail and the open panes. Call after the top bars and before the central panel.
 pub fn show(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
+    if app.compact {
+        show_compact(app, ui);
+        return;
+    }
     if let Some(panel) = app.right {
         app.last_right = panel;
     }

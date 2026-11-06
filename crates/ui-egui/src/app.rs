@@ -62,6 +62,12 @@ impl RabiCraftApp {
         }
     }
 
+    /// Whether the desktop's mode row (Tools/Edit/Convert/E-Sign) was drawn the last frame. The
+    /// phone layout keeps those workspaces in its one bar instead, and its test reads this.
+    pub fn mode_bar_drawn(&self) -> bool {
+        self.mode_bar_shown
+    }
+
     /// Construct an application with the default session, panels, theme and control state.
     pub fn new() -> Self {
         Self {
@@ -166,7 +172,12 @@ impl RabiCraftApp {
             failed_inbox: Default::default(),
             unsaved_flag: Default::default(),
             os_events: None,
+            compact: false,
+            compact_menu: false,
+            compact_applied: false,
+            mode_bar_shown: false,
             host_save: None,
+            host_download: None,
             host_dirty: None,
             close_request: None,
             save_prompt_button: Default::default(),
@@ -470,6 +481,21 @@ impl eframe::App for RabiCraftApp {
             }
         }
         self.sync_theme(ctx);
+        // A phone: rows a finger can hit and a larger interface, once, and only when the user has
+        // not chosen an interface size (Preferences ▸ Interface size keeps the last word).
+        if self.compact && !self.compact_applied {
+            self.compact_applied = true;
+            // Hotbar buttons and check boxes too, not only the default button height.
+            ctx.style_mut(|style| {
+                style.spacing.interact_size.y = crate::chrome::COMPACT_ROW;
+                style.spacing.button_padding.y = 10.0;
+            });
+            // A larger interface, as an explicit factor, so Preferences ▸ Interface size shows
+            // which size the phone is at and can change it.
+            if self.ui_scale.is_none() {
+                self.ui_scale = Some(ui_scale::PHONE);
+            }
+        }
         let native = ctx.native_pixels_per_point().unwrap_or(1.0);
         ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.system_text_scale, native), &mut self.ui_scale_applied);
         // Remember user work even if its tab is subsequently closed or Home is selected.
@@ -665,7 +691,11 @@ impl eframe::App for RabiCraftApp {
             window_controls::resize_edges(&ctx);
         }
         chrome::tab_strip(self, ui);
-        chrome::mode_bar(self, ui);
+        // The phone's bar already holds the workspaces: no second row for them.
+        self.mode_bar_shown = !self.compact;
+        if self.mode_bar_shown {
+            chrome::mode_bar(self, ui);
+        }
         // Whichever way another tab came to the front, it shows instead of the expanded view.
         if self.all_tools_full && self.all_tools_tab != self.shown_tab() {
             self.all_tools_full = false;
