@@ -22,7 +22,8 @@ if [[ "${1:-}" != "--skip-web" ]]; then
   (cd "$ROOT/apps/rabicraft-web" && trunk build --release)
   SITE="$ROOT/dist/web"
   [[ -f "$SITE/index.html" ]] || { echo "error: $SITE/index.html missing; rerun without --skip-web" >&2; exit 1; }
-  # The host page frames ./app/index.html, so the site keeps its own folder under assets/.
+  # The host page frames ./index.html (?host=parent) at the root of assets/web: the site is copied
+  # in as it is, and check-page.py below refuses the two drifting apart.
   rm -rf "$WEB"
   mkdir -p "$WEB"
   cp -R "$SITE/." "$WEB/"
@@ -30,10 +31,12 @@ if [[ "${1:-}" != "--skip-web" ]]; then
 fi
 [[ -f "$WEB/index.html" ]] || { echo "error: $WEB/index.html missing; rerun without --skip-web" >&2; exit 1; }
 
-# The launcher icon is generated from the committed master; refuse a stale one, and refuse a
-# resource reference the APK has no file for (AAPT2 would only say so at link time).
+# The launcher icon is generated from the committed master; refuse a stale one, refuse a resource
+# reference the APK has no file for (AAPT2 would only say so at link time), and refuse an APK whose
+# host page frames a file it does not ship (an empty window on the phone, with no error).
 python3 "$HERE/icons.py" --check
 python3 "$HERE/check-resources.py"
+python3 "$HERE/check-page.py"
 
 # The version the APK reports comes from the one place it lives.
 sed -i.bak -E "s/versionName = \"[^\"]*\"/versionName = \"$VERSION\"/" "$APP/build.gradle.kts"

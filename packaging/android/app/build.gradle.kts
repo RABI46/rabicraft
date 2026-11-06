@@ -18,7 +18,9 @@ android {
         // Android 16 (API 36), the level Google Play requires of new apps; side-loaded builds only
         // have to satisfy the platform they run on.
         targetSdk = 36
-        versionCode = 1
+        // Bumped by hand for a fix that must install over the build it replaces; `versionName` comes
+        // from Cargo.toml (package.sh sets it).
+        versionCode = 2
         versionName = "0.17.0"
     }
 

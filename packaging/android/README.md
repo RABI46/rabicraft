@@ -38,12 +38,26 @@ the same for every build (see [Signing](#signing)), so this keeps the app's data
 |---|---|---|
 | Browser build | `apps/rabicraft-web` → `app/src/main/assets/web` | One implementation: the APK runs what the web release runs. |
 | Its own origin | `MainActivity.Site` serves `https://rabicraft.localhost/` from those assets | `localStorage` is refused to `file://` documents, and any shared origin would let another site reach the app. `*.localhost` resolves to loopback, is a secure context, and needs no network permission. |
+| Framed page | `HostPage.FRAME` = `./index.html?host=parent` | `package.sh` copies trunk's output to the root of `assets/web`, so the site is next to `host.html`. `check-page.py` refuses a build where the two disagree: a frame pointed at a missing file is an empty window and no error at all. |
 | Host bridge | `HostPage.kt` + `MainActivity.Bridge` | A WebView has no download of its own, so the page's `<a download>` save goes nowhere. Framing it with `?host=parent` makes the page post saves and receive documents instead — the protocol `apps/rabicraft-web/src/main.rs`'s `mod host` already speaks for the Nextcloud app. |
 | Files | MediaStore (`Downloads/RabiCraft`) | No permission, no `MANAGE_EXTERNAL_STORAGE`, visible to the user. |
 | Icon | `res/drawable/ic_launcher_foreground.xml` | Generated from `assets/app-icon/rabicraft.svg` by `icons.py`: the master artwork, as a VectorDrawable, so no raster is committed or needs regenerating offline. |
 
 There is **no handwritten JavaScript in the build tree**: the host page is a Kotlin string
 (`HostPage.kt`), and its behaviour is pinned by `app/src/test/…/HostPageTest.kt`.
+
+## If the window stays blank
+
+Nothing is silent any more: a frame that never reports ready leaves a notice on screen after eight
+seconds, a page refused by the WebView shows its address and reason, and a page missing from the APK
+says so. The page's console goes to logcat under one tag:
+
+```sh
+adb logcat -s RabiCraft
+```
+
+`RabiCraft` missing from the output entirely means the WebView is not intercepting the app's origin
+at all; `missing from the APK: web/…` names the file the build should have shipped.
 
 ## Build it
 
@@ -78,3 +92,7 @@ or run `apksigner sign --ks <keystore> --out <apk> <apk>` on the built file.
 `cargo xtask ci` runs the workspace and does not build the APK (no Android SDK on that runner).
 `.github/workflows/android.yml` does: it builds the APK, runs the Kotlin tests of the host page, and
 verifies that `assets/web/index.html` is inside the archive and that the signature verifies.
+
+Before Gradle runs, `package.sh` refuses three classes of mistake that would otherwise surface on a
+phone: a stale launcher icon (`icons.py --check`), a resource reference with no file behind it
+(`check-resources.py`), and a host page framing a page the APK does not ship (`check-page.py`).
