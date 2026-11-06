@@ -486,7 +486,7 @@ impl eframe::App for RabiCraftApp {
         if self.compact && !self.compact_applied {
             self.compact_applied = true;
             // Hotbar buttons and check boxes too, not only the default button height.
-            ctx.style_mut(|style| {
+            ctx.all_styles_mut(|style| {
                 style.spacing.interact_size.y = crate::chrome::COMPACT_ROW;
                 style.spacing.button_padding.y = 10.0;
             });
