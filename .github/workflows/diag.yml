@@ -1,0 +1,36 @@
+name: Diag
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  diag:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+      - name: fmt
+        run: |
+          cargo fmt --all -- --check > /tmp/fmt.txt 2>&1 || true
+          python3 - <<'PY'
+          import os
+          text = open('/tmp/fmt.txt').read().splitlines()
+          lines = [l for l in text if l.strip()]
+          for l in lines[:12]:
+              msg = l.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+              print(f"::error title=fmt::{msg[:900]}")
+          print(f"::error title=fmt-total::total lines {len(lines)}")
+          PY
+      - name: check wasm
+        run: |
+          cargo check -p rabicraft-ui-egui --target wasm32-unknown-unknown --message-format short > /tmp/check.txt 2>&1 || true
+          python3 - <<'PY'
+          text = open('/tmp/check.txt').read().splitlines()
+          errs = [l for l in text if ': error' in l or l.startswith('error')]
+          for l in errs[:12]:
+              print(f"::error title=wasm::{l.replace('%','%25')[:900]}")
+          print(f"::error title=wasm-total::total errors {len(errs)}")
+          PY
