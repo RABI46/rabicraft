@@ -548,7 +548,7 @@ fn compact_bar(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 let tip = tl!("Menus, files and tools");
-                let button = icons::button(ui, "ellipsis", 40.0, app.compact_menu, &tip);
+                let button = icons::button(ui, "ellipsis", 40.0, app.compact_menu, tip);
                 if button.clicked() {
                     app.compact_menu = !app.compact_menu;
                 }
@@ -606,7 +606,7 @@ fn compact_bar(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
                 // needs before anything else, and a second file is as likely as the first.
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let tip = tl!("Open file");
-                    if icons::button(ui, "folder-open", 40.0, false, &tip).clicked() {
+                    if icons::button(ui, "folder-open", 40.0, false, tip).clicked() {
                         app.open_dialog();
                     }
                 });
