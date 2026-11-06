@@ -7,6 +7,8 @@
     <string name="storage_refused">the Downloads folder refused the file</string>
     <string name="saved">Saved to %1$s</string>
     <string name="start_failed">RabiCraft couldn\'t start: %1$s</string>
+    <string name="page_failed">RabiCraft couldn\'t load its page (%1$s): %2$s</string>
+    <string name="page_missing">RabiCraft is missing its page (%1$s) in this build. Reinstall a complete APK.</string>
     <string name="unsaved">This document has unsaved changes. Leave without saving?</string>
     <string name="discard">Leave</string>
 </resources>

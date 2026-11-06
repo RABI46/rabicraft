@@ -12,10 +12,13 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Base64
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -70,7 +73,7 @@ class MainActivity : Activity() {
         }
         web.addJavascriptInterface(Bridge(), "RabiCraftAndroid")
         web.webViewClient = Site()
-        web.webChromeClient = WebChromeClient()
+        web.webChromeClient = Console()
         status = TextView(this).apply {
             setText(R.string.opening)
             setPadding(32, 32, 32, 32)
@@ -124,8 +127,21 @@ class MainActivity : Activity() {
         deliver(name(uri), bytes)
     }
 
-    /** Serves the APK's assets, and the host page above them, from the app's own origin. */
+    /**
+     * Serves the APK's assets, and the host page above them, from the app's own origin.
+     *
+     * Two failures that would otherwise leave a blank window are reported: an address the WebView
+     * refuses outright (no notice at all, it only calls `onReceivedError`) and the host page itself
+     * missing from the APK.
+     */
     inner class Site : WebViewClient() {
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+            Log.e(TAG, "could not load ${request.url}: ${error.description}")
+            // A frame's own 404 is not an error the WebView reports, but a refused document is:
+            // that is the case where the window would stay blank with nothing on screen.
+            if (request.isForMainFrame) show(getString(R.string.page_failed, request.url.toString(), error.description.toString()))
+        }
+
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val url = request.url
             if (url.host != HOST) return null
@@ -136,11 +152,29 @@ class MainActivity : Activity() {
             val stream = try {
                 assets.open("web/$path")
             } catch (e: IOException) {
+                // A frame pointed at a file the APK does not have is an empty screen and nothing
+                // else: no error is raised for it, so it is reported here.
+                Log.e(TAG, "missing from the APK: web/$path")
+                if (path == "index.html") {
+                    val text = getString(R.string.page_missing, path)
+                    runOnUiThread {
+                        show(text)
+                        web.evaluateJavascript("window.RabiCraftNotice && window.RabiCraftNotice(${js(text)})", null)
+                    }
+                }
                 return reply(404, "text/plain", ByteArray(0))
             }
             // As packaging/web/README.md asks of any host: a hashed file never changes, and
             // index.html is always revalidated.
             return WebResourceResponse(mime(path), null, 200, "OK", cacheHeaders(path), stream)
+        }
+    }
+
+    /** The page's console, in logcat under one tag: `adb logcat -s RabiCraft`. */
+    inner class Console : WebChromeClient() {
+        override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+            Log.i(TAG, "${message.messageLevel()} ${message.sourceId()}:${message.lineNumber()} ${message.message()}")
+            return true
         }
     }
 
@@ -176,6 +210,7 @@ class MainActivity : Activity() {
         /** The frame could not start (no WebGL 2, for instance). */
         @JavascriptInterface
         fun failed(error: String) {
+            Log.e(TAG, "the app could not start: $error")
             runOnUiThread { show(getString(R.string.start_failed, error)) }
         }
     }
@@ -291,5 +326,8 @@ class MainActivity : Activity() {
     private companion object {
         const val HOST = "rabicraft.localhost"
         const val ORIGIN = "https://$HOST"
+
+        /** Everything the WebView says goes to logcat under this tag: `adb logcat -s RabiCraft`. */
+        const val TAG = "RabiCraft"
     }
 }

@@ -14,12 +14,23 @@ internal object HostPage {
     private const val ORIGIN = "https://rabicraft.localhost"
 
     /**
+     * The browser build, relative to this page: `package.sh` copies trunk's output to the root of
+     * `assets/web`, so the site is `./index.html` next to `host.html`, not in a folder of its own.
+     * `HostPageTest` and `check-page.py` both fail if this names a file the APK does not ship — a
+     * frame pointed at a missing page is an empty screen, with no error anywhere on a phone.
+     */
+    const val FRAME = "./index.html?host=parent"
+
+    /**
      * `window.RabiCraftOpen(name, base64)` hands a document to the frame. It waits for
      * `rabicraft:ready`: the frame installs its listener in the run callback that posts `ready`, so
      * a message sent earlier is dropped. Anything opened while it loads is queued.
      *
      * The app answers a save with `window.RabiCraftSaved(path)`; the frame needs no answer, the
      * write has already happened by then.
+     *
+     * Nothing here is silent: if the frame does not answer in time, and whenever the browser
+     * refuses to load it, the notice says so instead of leaving an empty screen.
      */
     fun html(): String =
         """
@@ -32,9 +43,10 @@ internal object HostPage {
             <style>
               html, body { margin: 0; height: 100%; overflow: hidden; background: #f1f1f3; }
               iframe { display: block; width: 100%; height: 100%; border: 0; }
-              /* Shown until the frame answers rabicraft:ready; the frame paints itself after. */
+              /* Shown until the app answers rabicraft:ready; the app paints itself after. */
               #loading { position: absolute; inset: 0; display: flex; align-items: center;
-                         justify-content: center; font: 16px sans-serif; color: #55555c; }
+                         justify-content: center; padding: 24px; box-sizing: border-box;
+                         text-align: center; font: 16px/1.5 sans-serif; color: #55555c; }
               @media (prefers-color-scheme: dark) {
                 html, body { background: #19191c; }
                 #loading { color: #b9b9c0; }
@@ -43,12 +55,22 @@ internal object HostPage {
           </head>
           <body>
             <div id="loading">Opening RabiCraft…</div>
-            <iframe id="app" src="./app/index.html?host=parent" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+            <iframe id="app" src="$FRAME" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
             <script>
               const frame = document.getElementById('app');
               const loading = document.getElementById('loading');
               let ready = false;
               let queued = null;
+
+              // The app's own notice, if one arrived before the frame failed: it says more than
+              // "could not load", and the frame's message must not overwrite it.
+              let detail = '';
+
+              function notice(text) {
+                if (ready) return;
+                loading.textContent = detail || text;
+                loading.style.display = 'flex';
+              }
 
               function deliver(name, bytes) {
                 frame.contentWindow.postMessage({ type: 'rabicraft:open', name: name, bytes: bytes }, '$ORIGIN');
@@ -60,8 +82,18 @@ internal object HostPage {
                 if (ready) deliver(name, bytes); else queued = [name, bytes];
               };
 
-              // The frame's own script paints over this notice; keep it until then.
-              window.setTimeout(function () { loading.style.display = 'none'; }, 8000);
+              // The app found something it had to refuse (a page it cannot serve, a document it
+              // cannot open): say it here rather than over an empty canvas.
+              window.RabiCraftNotice = function (text) { detail = String(text); notice(detail); };
+
+              // The watch covers the frames that never reach this page's message listener — a
+              // missing file, a load the browser refused — which used to show as a blank screen.
+              // The frame's own diagnostics (`rabicraft:failed`) arrive sooner and are specific.
+              window.setTimeout(function () {
+                notice('RabiCraft is taking longer than expected to start.\n\n' +
+                       'If this stays, the app could not load its page: the WebView may not be ' +
+                       'drawing (WebGL 2 is required).');
+              }, 8000);
 
               window.addEventListener('message', function (event) {
                 if (event.origin !== '$ORIGIN' || event.source !== frame.contentWindow) return;
