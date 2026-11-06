@@ -21,7 +21,7 @@ jobs:
   lint:
     # Pinned to the reviewed commit (not @main): this fork runs the shared workflow with its own
     # secrets, so a change reaches it only through a reviewed bump of this line.
-    uses: storytold/craft-common-actions/.github/workflows/packaging-lint.yml@eddaf203b2d4873525a69842240214b23bac65ba
+    uses: storytold/craft-common-actions/.github/workflows/packaging-lint.yml@e8500913a3e3e5e5e029b862da3ed420b0aa26ad
 
   windows-install-policy:
     timeout-minutes: 10

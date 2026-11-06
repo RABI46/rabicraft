@@ -45,7 +45,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check out craft-i18n
-        uses: storytold/craft-common-actions/actions/checkout-craft-i18n@eddaf203b2d4873525a69842240214b23bac65ba
+        uses: storytold/craft-common-actions/actions/checkout-craft-i18n@e8500913a3e3e5e5e029b862da3ed420b0aa26ad
       - name: Install Rust
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
