@@ -1,0 +1,43 @@
+name: Diag
+on: pull_request
+permissions:
+  contents: read
+concurrency:
+  group: diag-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: trunk
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /usr/local/bin trunk
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: sdk
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools" >/dev/null
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - name: package
+        run: |
+          packaging/android/package.sh > /tmp/pkg.txt 2>&1 || true
+          python3 - <<'PY'
+          lines = open('/tmp/pkg.txt', errors='replace').read().splitlines()
+          keep = [l for l in lines if 'error' in l.lower() or 'FAILED' in l or 'error:' in l or l.startswith('e: ') or '> Task' in l and 'FAILED' in l]
+          for l in keep[-40:]:
+              print(f"::error title=apk::{l.replace('%','%25')[:1000]}")
+          print("::error title=apk-tail::" + ' | '.join(x.replace('%','%25')[:200] for x in lines[-15:]))
+          PY

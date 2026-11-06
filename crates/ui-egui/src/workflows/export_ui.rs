@@ -275,10 +275,15 @@ impl RabiCraftApp {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            let msg =
-                run(ExportTask { src, kind, dpi, format, min_side, pages, stem, status: &status, lang: crate::i18n::current() }, |name, bytes| {
-                    crate::editing::download(name, &bytes)
-                });
+            // A framed page that takes files itself (the Android WebView) receives the export
+            // through `host_download`; a plain browser downloads it, as before. The bytes go to
+            // the page (base64, through `postMessage`), which holds no reference to the app.
+            let mut sink = |name: &str, bytes: Vec<u8>| -> Result<(), String> {
+                if let Some(save) = self.host_download.as_ref() { save(name, &bytes, true) } else { crate::editing::download(name, &bytes) }
+            };
+            let msg = run(ExportTask { src, kind, dpi, format, min_side, pages, stem, status: &status, lang: crate::i18n::current() }, &mut sink);
+            // The export is done with the app: the sink's borrow of it ends here.
+            drop(sink);
             if let Ok(mut s) = status.lock() {
                 *s = Some((0, 0, Some(msg)));
             }

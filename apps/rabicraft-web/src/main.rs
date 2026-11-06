@@ -23,6 +23,11 @@ fn main() {
                 options,
                 Box::new(|cc| {
                     let mut app = RabiCraftApp::new();
+                    // `?compact=1`: a phone's layout (one bar, menus in a sheet, panes over the
+                    // page). Set before the first frame, which is where it is applied.
+                    if query_param("compact").as_deref() == Some("1") {
+                        app.compact = true;
+                    }
                     // "printcraft": settings saved under the app's former name, PrintCraft.
                     if let Some(json) = cc.storage.and_then(|s| s.get_string("rabicraft").or_else(|| s.get_string("printcraft"))) {
                         app.restore(&json);
@@ -68,6 +73,10 @@ fn main() {
                         }
                         bridge.listen(app.startup_inbox.clone(), cc.egui_ctx.clone());
                         app.host_save = Some(bridge.save_fn());
+                        // Exports (images, OCR text, CSV, XFDF, a print-ready PDF) reach the host
+                        // too: in a WebView an `<a download>` goes nowhere, so an export the app
+                        // cannot take would be a file the user loses.
+                        app.host_download = Some(bridge.save_fn());
                         app.host_dirty = Some(bridge.dirty_fn());
                         bridge.post_ready();
                     } else if query_param("host").as_deref() == Some("parent") {

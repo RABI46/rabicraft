@@ -9,6 +9,16 @@
     <string name="start_failed">RabiCraft couldn\'t start: %1$s</string>
     <string name="page_failed">RabiCraft couldn\'t load its page (%1$s): %2$s</string>
     <string name="page_missing">RabiCraft is missing its page (%1$s) in this build. Reinstall a complete APK.</string>
+    <string name="files_title">Files</string>
+    <string name="files_empty">Nothing saved yet. RabiCraft keeps its PDFs in Downloads/RabiCraft.</string>
+    <string name="files_browse">Browse this device…</string>
+    <string name="files_open">Open</string>
+    <string name="files_save_as">Save a copy elsewhere…</string>
+    <string name="files_send">Send a copy</string>
+    <string name="files_copied">A copy is saved.</string>
+    <string name="files_copy_failed">Couldn\'t write the copy there.</string>
+    <string name="files_missing">That file is no longer in Downloads/RabiCraft.</string>
+    <string name="files_no_app">No app on this device can do that.</string>
     <string name="unsaved">This document has unsaved changes. Leave without saving?</string>
     <string name="discard">Leave</string>
 </resources>

@@ -164,8 +164,10 @@ impl RabiCraftApp {
         }
         let panels = side_panels::restore(&v);
         self.side_panels = panels.panels;
+        // A phone starts with the page alone: a layout saved on a desktop would put the tools
+        // pane over the page on the very first frame.
         if let Some(open) = panels.tools_open {
-            self.left_open = open;
+            self.left_open = open && !self.compact;
         }
         if let Some(right) = v.get("docking_right") {
             self.right = serde_json::from_value(right.clone()).ok().flatten().filter(|_| !panels.side_closed);

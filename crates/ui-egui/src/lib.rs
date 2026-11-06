@@ -446,6 +446,23 @@ pub struct RabiCraftApp {
     pub os_events: Option<OsEventsFn>,
     /// Save delivers to the embedding page instead of downloading (web, see [`HostSaveFn`]).
     pub host_save: Option<HostSaveFn>,
+    /// Whether the screen is a phone (or a host that asked for it): the chrome then keeps its
+    /// menus behind one button, its panes and tools behind that button too, and its rows
+    /// finger-high. Set once, before the first frame, by the host (`?compact=1` in the page URL);
+    /// saved settings never change it, and nothing else in the app reads it.
+    pub compact: bool,
+    /// The phone layout's whole menu is open, the one button in its bar.
+    pub compact_menu: bool,
+    /// The phone's touch sizing has been applied to the style (once, on the first frame).
+    compact_applied: bool,
+    /// Whether this frame drew the desktop's mode row (false on a phone, which keeps the
+    /// workspaces in its one bar). Read by the layout's test.
+    mode_bar_shown: bool,
+    /// Every other exported file (images, OCR text, CSV reports, XFDF, a print-ready PDF) goes to
+    /// the embedding page too (web, see [`HostSaveFn`]). A plain browser leaves this `None` and the
+    /// files download; a host that has nowhere to put an `<a download>`, such as the Android
+    /// WebView, sets it so an export lands beside a save instead of disappearing.
+    pub host_download: Option<HostSaveFn>,
     /// Reports unsaved work to the embedding page (web, see [`HostDirtyFn`]).
     pub host_dirty: Option<HostDirtyFn>,
     /// A pending "save changes?" question (closing a dirty tab or quitting).

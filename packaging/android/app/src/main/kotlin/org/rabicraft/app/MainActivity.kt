@@ -10,14 +10,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import android.provider.OpenableColumns
 import android.util.Base64
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -42,13 +39,26 @@ import java.io.IOException
  *
  * **The host bridge.** A WebView has no download of its own, so the browser build's Save, which
  * clicks an `<a download>`, would go nowhere. The app frames the page in [HostPage] with
- * `?host=parent`, which makes it deliver saves as `rabicraft:save` messages instead; the app writes
- * them with MediaStore (Downloads/RabiCraft), and hands documents it was opened with back as
- * `rabicraft:open`. The message shapes are pinned by the page's test.
+ * `?host=parent`, which makes it deliver saves — and exports, which are files too — as
+ * `rabicraft:save` messages instead; the app writes them with MediaStore (Downloads/RabiCraft),
+ * and hands documents it was opened with back as `rabicraft:open`. The message shapes are pinned
+ * by the page's test.
+ *
+ * **Files.** [Chooser] gives the page's own `<input type=file>` the system picker (a WebView has
+ * none), and [Files] lists what the app saved and offers the system picker for anywhere else. Both
+ * go through Android's documents UI, so wherever the phone can mount a provider — another cloud
+ * app, a USB stick, Drive — is a place a document can be opened from or copied to, with no
+ * account and no permission of the app's own.
  */
 class MainActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var status: TextView
+
+    /** The page's file inputs, and the files this app opens. */
+    private lateinit var chooser: Chooser
+
+    /** The app's own file list, share and save-as. */
+    private lateinit var files: Files
 
     /** A document from Open with / Share, delivered once [HostPage] says the frame is ready. */
     private var queued: Pair<String, ByteArray>? = null
@@ -64,6 +74,9 @@ class MainActivity : Activity() {
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            // The app is not a browser: a mobile user agent keeps the page's own text fields and
+            // viewport behaviour sane, and nothing here loads a remote site.
+            userAgentString = "$userAgentString RabiCraft/$VERSION"
             // The whole app is in the APK: no page may reach a file or a content provider.
             allowFileAccess = false
             allowContentAccess = false
@@ -73,7 +86,9 @@ class MainActivity : Activity() {
         }
         web.addJavascriptInterface(Bridge(), "RabiCraftAndroid")
         web.webViewClient = Site()
-        web.webChromeClient = Console()
+        chooser = Chooser(this)
+        files = Files(this)
+        web.webChromeClient = chooser
         status = TextView(this).apply {
             setText(R.string.opening)
             setPadding(32, 32, 32, 32)
@@ -85,6 +100,19 @@ class MainActivity : Activity() {
         })
         readIntent(intent)
         web.loadUrl("$ORIGIN/host.html")
+    }
+
+    /** The result of a picker this app started: the page's `<input type=file>`, or Open with. */
+    @Deprecated("The platform's own callback is deprecated since API 30; FILE_CHOOSER_RESULT is still how a WebView answers.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        chooser.onActivityResult(requestCode, resultCode, data)
+        files.onActivityResult(requestCode, resultCode, data)
+    }
+
+    /** The file sheet: what this app saved, the system picker, and where to send a copy. */
+    fun showFiles() {
+        files.sheet()
     }
 
     /** A document sent from another app while RabiCraft is open. */
@@ -117,14 +145,33 @@ class MainActivity : Activity() {
     private fun readIntent(intent: Intent?) {
         val uri = intent?.data ?: return
         if (intent.action != Intent.ACTION_VIEW && intent.action != Intent.ACTION_SEND) return
+        readDocument(uri)
+    }
+
+    /**
+     * Open `uri` (Open with, Share, or a row of the file sheet) as a tab. The bytes go through the
+     * host page so the frame opens them like any other document, name and all.
+     */
+    fun readDocument(uri: Uri) {
+        val name = displayName(uri)
         val bytes = try {
             contentResolver.openInputStream(uri)?.use { it.readBytes() }
         } catch (e: IOException) {
-            show(getString(R.string.open_failed, name(uri), e.message.orEmpty()))
+            Log.e(TAG, "could not read $uri: $e")
+            show(getString(R.string.open_failed, name, e.message.orEmpty()))
             return
-        } ?: return
-        queued = name(uri) to bytes
-        deliver(name(uri), bytes)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "refused reading $uri: $e")
+            show(getString(R.string.open_failed, name, e.message.orEmpty()))
+            return
+        }
+        if (bytes == null) {
+            Log.e(TAG, "no stream for $uri")
+            show(getString(R.string.open_failed, name, getString(R.string.files_missing)))
+            return
+        }
+        queued = name to bytes
+        deliver(name, bytes)
     }
 
     /**
@@ -170,14 +217,6 @@ class MainActivity : Activity() {
         }
     }
 
-    /** The page's console, in logcat under one tag: `adb logcat -s RabiCraft`. */
-    inner class Console : WebChromeClient() {
-        override fun onConsoleMessage(message: ConsoleMessage): Boolean {
-            Log.i(TAG, "${message.messageLevel()} ${message.sourceId()}:${message.lineNumber()} ${message.message()}")
-            return true
-        }
-    }
-
     /** `window.RabiCraftAndroid`: the app side of [HostPage]'s script. Called from a WebView thread. */
     inner class Bridge {
         /**
@@ -207,6 +246,12 @@ class MainActivity : Activity() {
             queued?.let { (name, bytes) -> deliver(name, bytes) }
         }
 
+        /** The frame's own "Files" button: the app's file list, over the page. */
+        @JavascriptInterface
+        fun files() {
+            runOnUiThread { showFiles() }
+        }
+
         /** The frame could not start (no WebGL 2, for instance). */
         @JavascriptInterface
         fun failed(error: String) {
@@ -221,7 +266,10 @@ class MainActivity : Activity() {
      * where the file went itself, as `mod host` expects of an embedding page.
      */
     private fun save(name: String, bytes: ByteArray, saveAs: Boolean) {
-        val path = if (!saveAs && lastSaved != null) overwrite(lastSaved!!, bytes) else create(name, bytes)
+        // A plain Save overwrites the file this document was saved to, and only that one: a
+        // document opened from another app has no file of its own, and the last save may belong
+        // to a different tab.
+        val path = if (!saveAs && lastSaved?.endsWith("/$name") == true) overwrite(lastSaved!!, bytes) else create(name, bytes)
         if (path == null) {
             show(getString(R.string.save_failed, name, getString(R.string.storage_refused)))
             return
@@ -304,7 +352,7 @@ class MainActivity : Activity() {
     private fun deliver(name: String, bytes: ByteArray) {
         // The page's own queue holds it until it is ready, so this only waits for the bridge.
         if (!ready) return
-        web.evaluateJavascript("window.RabiCraftOpen && window.RabiCraftOpen(${js(name)}, ${js(Base64.encodeToString(bytes, Base64.NO_WRAP))})", null)
+        web.evaluateJavascript("window.RabiCraftOpen && window.RabiCraftOpen(${js(name)}, ${js(encode(bytes))})", null)
         if (queued?.first == name) queued = null
     }
 
@@ -314,13 +362,6 @@ class MainActivity : Activity() {
     private fun show(message: String) {
         status.text = message
         status.visibility = View.VISIBLE
-    }
-
-    private fun name(uri: Uri): String {
-        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-            if (it.moveToFirst() && !it.isNull(0)) return it.getString(0)
-        }
-        return uri.lastPathSegment?.substringAfterLast('/') ?: "document.pdf"
     }
 
     private companion object {

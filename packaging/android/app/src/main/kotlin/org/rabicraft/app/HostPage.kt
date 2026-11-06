@@ -19,7 +19,7 @@ internal object HostPage {
      * `HostPageTest` and `check-page.py` both fail if this names a file the APK does not ship — a
      * frame pointed at a missing page is an empty screen, with no error anywhere on a phone.
      */
-    const val FRAME = "./index.html?host=parent"
+    const val FRAME = "./index.html?host=parent&compact=1"
 
     /**
      * `window.RabiCraftOpen(name, base64)` hands a document to the frame. It waits for
@@ -43,6 +43,11 @@ internal object HostPage {
             <style>
               html, body { margin: 0; height: 100%; overflow: hidden; background: #f1f1f3; }
               iframe { display: block; width: 100%; height: 100%; border: 0; }
+              /* The app's own Files button: small, over the right end of the app's one bar, clear
+                 of its height so a tap misses neither. */
+              #files { position: absolute; top: 5px; right: 6px; z-index: 2; padding: 9px 11px;
+                       font: 600 13px/1 sans-serif; color: #ffffff; background: #b70228;
+                       border: 0; border-radius: 6px; }
               /* Shown until the app answers rabicraft:ready; the app paints itself after. */
               #loading { position: absolute; inset: 0; display: flex; align-items: center;
                          justify-content: center; padding: 24px; box-sizing: border-box;
@@ -55,6 +60,8 @@ internal object HostPage {
           </head>
           <body>
             <div id="loading">Opening RabiCraft…</div>
+            <!-- Over the frame's own bar: the files this device holds, and where a copy goes. -->
+            <button id="files" type="button">Files</button>
             <iframe id="app" src="$FRAME" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
             <script>
               const frame = document.getElementById('app');
@@ -75,6 +82,12 @@ internal object HostPage {
               function deliver(name, bytes) {
                 frame.contentWindow.postMessage({ type: 'rabicraft:open', name: name, bytes: bytes }, '$ORIGIN');
               }
+
+              // The app's file list: what this device holds, and where a save may go. The app
+              // draws it (native, over this page); nothing here needs to know what is in it.
+              document.getElementById('files').addEventListener('click', function () {
+                window.RabiCraftAndroid.files();
+              });
 
               // Called from the app (MainActivity.deliver); `bytes` is a Uint8Array.
               window.RabiCraftOpen = function (name, array) {

@@ -23,6 +23,23 @@ pub(super) mod tab_context;
 /// The app's name in the menus the layouts write (About, Hide, Quit).
 pub(crate) const APP_NAME: &str = "RabiCraft";
 
+/// One row of the phone's menu: a tall, flat button that a finger can hit.
+fn row(ui: &mut egui::Ui, label: &str, enabled: bool) -> bool {
+    ui.add_enabled(enabled, egui::Button::new(label).frame(false).min_size(egui::vec2(0.0, 44.0))).clicked()
+}
+
+/// A menu's items as rows, with the submenu each came from (a phone shows them flat). Separators
+/// and items this platform hides never become rows.
+fn flatten<'a>(nodes: &'a [Node], heading: Option<&'a str>, out: &mut Vec<(Option<&'a str>, &'a Item)>) {
+    for node in nodes {
+        match node {
+            Node::Item(item) => out.push((heading, item)),
+            Node::Submenu { label, children, .. } => flatten(children, Some(label.as_str()), out),
+            Node::Separator | Node::Standard { .. } => {}
+        }
+    }
+}
+
 /// The top bar's width after the menus: the mode tabs, the search box and the buttons.
 const ROW_AFTER_MENUS: f32 = 720.0;
 /// The narrowest the menu bar gets: one "Menu" title.
@@ -587,6 +604,65 @@ impl RabiCraftApp {
         for command in chosen {
             self.run_menu_command(&ctx, &command);
         }
+    }
+
+    /// The phone's menu: the desktop bar's own menus, opened as tall rows in a popup under the
+    /// menu button. Returns `true` when it should close (a command ran, or a tap landed outside).
+    ///
+    /// It is built from the same [`MenuBar`], laid out and gated the same way, so a phone has every
+    /// command a desktop has without a second definition to keep true — but each menu's items are
+    /// listed as rows instead of popups inside a popup, because that is what a finger can hit.
+    pub(crate) fn compact_menu_ui(&mut self, ui: &egui::Ui, anchor: egui::Rect) -> bool {
+        // The frame's context when it is known: the sheet is an `Area` over everything, not a
+        // child of the bar it hangs from.
+        let ctx = self.ctx.clone().unwrap_or_else(|| ui.ctx().clone());
+        let t = crate::theme::Tokens::get(&ctx);
+        let bar = craft_menu::layout(&self.menu_bar(&ctx), Target::current(), &layout_options()).bar;
+        let gate = self.menu_gate(&ctx);
+        let mut chosen: Option<CommandRef> = None;
+        let id = egui::Id::unique("rabicraft-compact-menu");
+        let area = egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(anchor.left_top()).constrain(true);
+        let mut show_tools = false;
+        let shown = area.show(&ctx, |ui| {
+            egui::Frame::popup(ui.style()).fill(t.panel).show(ui, |ui| {
+                ui.set_min_width((anchor.width() - 16.0).max(220.0));
+                ui.set_max_height((ctx.content_rect().height() - anchor.height() - 16.0).max(200.0));
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.spacing_mut().button_padding = egui::vec2(12.0, 12.0);
+                    // The tools this phone has: the pane opens over the page, not beside it.
+                    if row(ui, tl!("Tools"), true) {
+                        show_tools = true;
+                    }
+                    for menu in bar.menus.iter() {
+                        ui.label(egui::RichText::new(menu.title.as_str()).strong());
+                        // A submenu becomes a heading and its items: one tap, not two.
+                        let mut rows = Vec::new();
+                        flatten(&menu.children, None, &mut rows);
+                        for (heading, item) in rows {
+                            if let Some(heading) = heading {
+                                ui.label(egui::RichText::new(heading).italics());
+                            }
+                            if row(ui, &item.label, item.enabled && gate.allows(item)) {
+                                chosen = Some(item.command.clone());
+                            }
+                        }
+                        ui.add_space(10.0);
+                    }
+                });
+            });
+        });
+        if show_tools {
+            // The pane opens over the page; a closed one leaves the page as it is.
+            self.left_open = !self.left_open;
+            return true;
+        }
+        if let Some(command) = chosen {
+            self.run_menu_command(&ctx, &command);
+            return true;
+        }
+        // A tap outside the sheet closes it; the menu button itself is handled by the bar.
+        let pointer = ctx.input(|i| i.pointer.interact_pos());
+        ctx.input(|i| i.pointer.any_click()) && pointer.is_some_and(|p| !shown.response.rect.contains(p) && !anchor.contains(p))
     }
 
     /// Install the native menu bar (macOS), once, from the eframe app creator. `false` when
