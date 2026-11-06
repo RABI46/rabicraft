@@ -431,7 +431,7 @@ pub fn show_compact(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
         .exact_size(width)
         .resizable(false)
         .frame(egui::Frame::NONE.fill(t.panel).inner_margin(egui::Margin::ZERO))
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             let panels = app.side_panels;
             let labels = PaneLabels { resize: crate::i18n::t("Resize panels").to_owned(), ..PaneLabels::default() };
             let output = PaneHost::new(egui::Id::unique("rabicraft-compact-pane"))
