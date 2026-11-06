@@ -620,10 +620,8 @@ impl RabiCraftApp {
         let bar = craft_menu::layout(&self.menu_bar(&ctx), Target::current(), &layout_options()).bar;
         let gate = self.menu_gate(&ctx);
         let mut chosen: Option<CommandRef> = None;
-        let area = egui::Area::new(egui::Id::unique("rabicraft-compact-menu"))
-            .order(egui::Order::Foreground)
-            .fixed_pos(anchor.left_top())
-            .constrain(true);
+        let id = egui::Id::unique("rabicraft-compact-menu");
+        let area = egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(anchor.left_top()).constrain(true);
         let mut show_tools = false;
         let shown = area.show(&ctx, |ui| {
             egui::Frame::popup(ui.style()).fill(t.panel).show(ui, |ui| {
