@@ -427,7 +427,7 @@ pub fn show_compact(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
     }
     let t = crate::theme::Tokens::get(ui.ctx());
     let width = (ui.available_width() * 0.86).min(crate::chrome::COMPACT_PANE);
-    egui::SidePanel::right("compact_pane")
+    egui::Panel::right("compact_pane")
         .exact_width(width)
         .resizable(false)
         .frame(egui::Frame::NONE.fill(t.panel).inner_margin(egui::Margin::ZERO))

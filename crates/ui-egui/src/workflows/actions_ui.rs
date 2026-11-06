@@ -85,10 +85,9 @@ impl RabiCraftApp {
         // moves out of the app for the call: the batch runs inside it on the web, and borrowing
         // the field would borrow `self` twice.
         #[cfg(target_arch = "wasm32")]
-        let host = self.host_download.take();
-        self.run_action_into(action, files, host.as_ref());
-        #[cfg(target_arch = "wasm32")]
         {
+            let host = self.host_download.take();
+            self.run_action_into(action, files, host.as_ref());
             self.host_download = host;
         }
     }

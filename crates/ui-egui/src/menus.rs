@@ -626,7 +626,7 @@ impl RabiCraftApp {
         let shown = area.show(&ctx, |ui| {
             egui::Frame::popup(ui.style()).fill(t.panel).show(ui, |ui| {
                 ui.set_min_width((anchor.width() - 16.0).max(220.0));
-                ui.set_max_height((ctx.available_rect().height() - anchor.height() - 16.0).max(200.0));
+                ui.set_max_height((ctx.content_rect().height() - anchor.height() - 16.0).max(200.0));
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     ui.spacing_mut().button_padding = egui::vec2(12.0, 12.0);
                     // The tools this phone has: the pane opens over the page, not beside it.

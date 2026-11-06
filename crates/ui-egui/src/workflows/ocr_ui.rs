@@ -320,10 +320,9 @@ impl RabiCraftApp {
         // A host page takes each searchable copy itself; a browser downloads it. The sink moves
         // out of the app for the call: the batch runs inside it on the web.
         #[cfg(target_arch = "wasm32")]
-        let host = self.host_download.take();
-        self.ocr_files_into(files, settings, host.as_ref());
-        #[cfg(target_arch = "wasm32")]
         {
+            let host = self.host_download.take();
+            self.ocr_files_into(files, settings, host.as_ref());
             self.host_download = host;
         }
     }
