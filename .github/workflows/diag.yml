@@ -6,27 +6,38 @@ concurrency:
   group: diag-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  tests:
+  errors:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - name: apt
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev
-      - name: phone layout
+      - name: wasm
+        run: |
+          cargo check -p rabicraft-web --target wasm32-unknown-unknown --message-format short > /tmp/w.txt 2>&1 || true
+          python3 - <<'PY'
+          lines = [l for l in open('/tmp/w.txt').read().splitlines() if ': error' in l or l.startswith('error')]
+          for l in lines[:30]:
+              print(f"::error title=wasm::{l.replace('%','%25')[:1000]}")
+          print(f"::error title=wasm-total::total {len(lines)}")
+          PY
+      - name: native tests
+        run: |
+          cargo check -p rabicraft-ui-egui --all-targets --message-format short > /tmp/n.txt 2>&1 || true
+          python3 - <<'PY'
+          lines = [l for l in open('/tmp/n.txt').read().splitlines() if ': error' in l or l.startswith('error')]
+          for l in lines[:30]:
+              print(f"::error title=native::{l.replace('%','%25')[:1000]}")
+          print(f"::error title=native-total::total {len(lines)}")
+          PY
+      - name: tests
         run: |
           cargo test -p rabicraft-ui-egui --test it -- compact > /tmp/t.txt 2>&1 || true
           python3 - <<'PY'
-          lines = open('/tmp/t.txt').read().splitlines()
-          for l in lines[-40:]:
+          for l in open('/tmp/t.txt').read().splitlines()[-30:]:
               print(f"::error title=test::{l.replace('%','%25')[:1000]}")
-          PY
-      - name: i18n and chrome units
-        run: |
-          cargo test -p rabicraft-ui-egui --lib -- i18n:: chrome:: > /tmp/u.txt 2>&1 || true
-          python3 - <<'PY'
-          lines = open('/tmp/u.txt').read().splitlines()
-          for l in lines[-25:]:
-              print(f"::error title=unit::{l.replace('%','%25')[:1000]}")
           PY
