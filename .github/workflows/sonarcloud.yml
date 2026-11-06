@@ -17,5 +17,5 @@ concurrency:
 jobs:
   sonarcloud:
     # Pinned to the reviewed commit so the analysis runs code this fork reviewed.
-    uses: storytold/craft-common-actions/.github/workflows/sonarcloud.yml@eddaf203b2d4873525a69842240214b23bac65ba
+    uses: storytold/craft-common-actions/.github/workflows/sonarcloud.yml@e8500913a3e3e5e5e029b862da3ed420b0aa26ad
     secrets: inherit
