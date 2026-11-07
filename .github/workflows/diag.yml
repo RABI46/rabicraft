@@ -31,6 +31,25 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
+      - name: gate with fonts and i18n
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: "1"
+          RABICRAFT_ORACLES_REQUIRED: "1"
+        run: |
+          git clone -q https://github.com/storytold/craft-fonts craft-fonts || true
+          git -C craft-fonts checkout -q b076417b5880bd4154bd22f00695b1d28c6bea83 || true
+          cargo install cargo-nextest@0.9.150 --locked >/dev/null 2>&1 || true
+          cargo install cargo-deny@0.20.2 --locked >/dev/null 2>&1 || true
+          cargo xtask ci > /tmp/ci.txt 2>&1 || true
+          python3 - <<'PY'
+          import re
+          lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
+          keep = [l for l in lines if '=== ci:' in l or l.startswith('CI:') or re.search(r'^(error|warning)(\[|:)', l) or 'panicked' in l or 'FAILED' in l or 'left:' in l or 'right:' in l]
+          for l in keep[:50]:
+              print(f"::error title=ci::{l.replace('%','%25')[:1000]}")
+          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-20:]))
+          PY
       - name: package
         run: |
           packaging/android/package.sh > /tmp/pkg.txt 2>&1 || true
