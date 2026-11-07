@@ -76,7 +76,7 @@ class MainActivity : Activity() {
             domStorageEnabled = true
             // The app is not a browser: a mobile user agent keeps the page's own text fields and
             // viewport behaviour sane, and nothing here loads a remote site.
-            userAgentString = "$userAgentString RabiCraft/$VERSION"
+            userAgentString = "$userAgentString ${appVersion()}"
             // The whole app is in the APK: no page may reach a file or a content provider.
             allowFileAccess = false
             allowContentAccess = false
@@ -363,6 +363,15 @@ class MainActivity : Activity() {
         status.text = message
         status.visibility = View.VISIBLE
     }
+
+    /** The APK's own version (the `versionName` Gradle writes), for the user agent. */
+    private fun appVersion(): String =
+        try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
+        } catch (e: Exception) {
+            Log.e(TAG, "could not read the app's version: $e")
+            "unknown"
+        }
 
     internal companion object {
         const val HOST = "rabicraft.localhost"
