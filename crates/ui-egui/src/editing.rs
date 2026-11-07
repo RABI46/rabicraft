@@ -13,7 +13,7 @@ pub use close::CloseRequest;
 #[cfg(not(target_arch = "wasm32"))]
 pub use save::PendingOverwrite;
 #[cfg(target_arch = "wasm32")]
-pub(crate) use save::download;
+pub(crate) use save::{download, download_with};
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use save::in_document_folder;
 pub use save::{SaveTarget, write_atomically};
