@@ -364,7 +364,7 @@ class MainActivity : Activity() {
         status.visibility = View.VISIBLE
     }
 
-    private companion object {
+    internal companion object {
         const val HOST = "rabicraft.localhost"
         const val ORIGIN = "https://$HOST"
 
