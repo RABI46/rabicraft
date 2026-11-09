@@ -18,20 +18,20 @@ jobs:
       linux-env: RABICRAFT_ORACLES_REQUIRED=1
       command: |
         set -uo pipefail
-        cargo xtask ci > /tmp/ci.txt 2>&1 || true
-        python3 - <<'PY'
-        import re
-        lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
-        out = []
+        cargo xtask ci > /tmp/ci.txt 2>&1
+        status=$?
+        python3 - "$status" <<'PY'
+        import re, sys
+        status = sys.argv[1]
+        lines = [re.sub(r'\x1b\[[0-9;]*m', '', l) for l in open('/tmp/ci.txt', errors='replace').read().splitlines()]
+        out = [l for l in lines if '=== ci:' in l]
         for i, l in enumerate(lines):
-            if '=== ci:' in l:
-                out.append(l)
-            if re.search(r'^error(\[|:)|panicked|^FAILED|^ *FAILED|test result: FAILED|^error: ', l):
-                out.extend(lines[max(0, i - 6):i + 12])
-        out.extend(lines[-40:])
+            if re.search(r'^(error|FAILED|failures:)|panicked at|test result: FAILED', l):
+                out.extend(lines[max(0, i - 8):i + 14])
+        out.extend(lines[-30:])
         for l in out:
-            l = re.sub(r'\x1b\[[0-9;]*m', '', l)
             if l.strip():
                 print("::error title=probe::" + l.replace('%', '%25')[:900])
+        print("::error title=status::xtask ci exited " + status)
         PY
-        exit 1
+        exit "$status"
