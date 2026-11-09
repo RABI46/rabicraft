@@ -6,13 +6,18 @@ concurrency:
   group: diag-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  base:
+  head:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+      CARGO_NET_RETRY: "10"
+      RUST_BACKTRACE: "1"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      RABICRAFT_ORACLES_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: 98176d6fc8680b8d951de750183d7e87f056b158
       - name: Check out craft-fonts
         uses: actions/checkout@v4
         with:
@@ -33,15 +38,15 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.150,cargo-deny@0.20.2
-      - name: gate on the base commit
+      - name: gate
         run: |
-          RABICRAFT_ORACLES_REQUIRED=1 CARGO_PROFILE_DEV_DEBUG=line-tables-only cargo xtask ci > /tmp/ci.txt 2>&1 || true
+          cargo xtask ci > /tmp/ci.txt 2>&1 || true
           python3 - <<'PY'
           import re
           lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
           keep = [l for l in lines if '=== ci:' in l or l.startswith('CI:') or re.search(r'^(error|warning)(\[|:)', l)
-                  or 'panicked' in l or 'FAILED' in l or 'left:' in l or 'right:' in l]
-          for l in keep[:50]:
-              print(f"::error title=base::{l.replace('%','%25')[:1000]}")
-          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-20:]))
+                  or 'panicked' in l or 'FAILED' in l or 'left:' in l or 'right:' in l or 'icense' in l]
+          for l in keep[:40]:
+              print(f"::error title=head::{l.replace('%','%25')[:1000]}")
+          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:200] for x in lines[-25:]))
           PY
