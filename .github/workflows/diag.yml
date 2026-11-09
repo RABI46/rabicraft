@@ -5,58 +5,41 @@ permissions:
 concurrency:
   group: diag-${{ github.ref }}
   cancel-in-progress: true
-env:
-  ANDROID_HOME: /usr/local/lib/android/sdk
-  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 jobs:
-  apk:
+  gate:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Check out craft-fonts
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+          path: craft-fonts
+      - name: Build with craft-fonts
+        run: |
+          echo "CRAFT_FONTS_DIR=$GITHUB_WORKSPACE/craft-fonts" >> "$GITHUB_ENV"
+          echo "CRAFT_FONTS_REQUIRED=1" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
+          components: clippy, rustfmt
           targets: wasm32-unknown-unknown
-      - name: trunk
-        run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /usr/local/bin trunk
-      - uses: actions/setup-java@v4
+      - name: apt
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev qpdf poppler-utils
+      - name: tools
+        uses: taiki-e/install-action@v2
         with:
-          distribution: temurin
-          java-version: "17"
-      - name: sdk
+          tool: cargo-nextest@0.9.150,cargo-deny@0.20.2
+      - name: gate
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools" >/dev/null
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.14.3"
-      - name: gate with fonts and i18n
-        env:
-          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
-          CRAFT_FONTS_REQUIRED: "1"
-          RABICRAFT_ORACLES_REQUIRED: "1"
-        run: |
-          git clone -q https://github.com/storytold/craft-fonts craft-fonts || true
-          git -C craft-fonts checkout -q b076417b5880bd4154bd22f00695b1d28c6bea83 || true
-          cargo install cargo-nextest@0.9.150 --locked >/dev/null 2>&1 || true
-          cargo install cargo-deny@0.20.2 --locked >/dev/null 2>&1 || true
-          cargo xtask ci > /tmp/ci.txt 2>&1 || true
+          RABICRAFT_ORACLES_REQUIRED=1 cargo xtask ci > /tmp/ci.txt 2>&1 || true
           python3 - <<'PY'
           import re
           lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
-          keep = [l for l in lines if '=== ci:' in l or l.startswith('CI:') or re.search(r'^(error|warning)(\[|:)', l) or 'panicked' in l or 'FAILED' in l or 'left:' in l or 'right:' in l]
+          keep = [l for l in lines if '=== ci:' in l or l.startswith('CI:') or re.search(r'^(error|warning)(\[|:)', l)
+                  or 'panicked' in l or 'FAILED' in l or 'left:' in l or 'right:' in l or 'assert' in l]
           for l in keep[:50]:
               print(f"::error title=ci::{l.replace('%','%25')[:1000]}")
-          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-20:]))
-          PY
-      - name: package
-        run: |
-          packaging/android/package.sh > /tmp/pkg.txt 2>&1 || true
-          python3 - <<'PY'
-          lines = open('/tmp/pkg.txt', errors='replace').read().splitlines()
-          keep = [l for l in lines if 'error' in l.lower() or 'FAILED' in l or 'error:' in l or l.startswith('e: ') or '> Task' in l and 'FAILED' in l]
-          for l in keep[-40:]:
-              print(f"::error title=apk::{l.replace('%','%25')[:1000]}")
-          print("::error title=apk-tail::" + ' | '.join(x.replace('%','%25')[:200] for x in lines[-15:]))
+          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-25:]))
           PY
