@@ -1,0 +1,17 @@
+name: Diag
+on: pull_request
+permissions:
+  contents: read
+concurrency:
+  group: diag-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  plumb:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: versions
+        run: |
+          curl -sS https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2404-Readme.md | grep -iE "qpdf|poppler|^### |nextest" | head -40
+      - name: toolchain file
+        run: echo ok
