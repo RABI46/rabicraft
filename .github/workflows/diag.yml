@@ -26,11 +26,11 @@ jobs:
         lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
         keep = [l for l in lines if '=== ci:' in l]
         keep += [l for l in lines if re.search(r'^error(\[|:)', l) or 'panicked' in l or 'FAILED' in l or l.startswith('CI:') or l.startswith('error:')]
-        for l in keep[:60]:
+        for l in keep[:80]:
             print("::error title=probe::" + l.replace('%', '%25')[:900])
         for i, l in enumerate(lines):
             if re.search(r'^error(\[|:)', l):
-                for extra in lines[max(0, i - 3):i + 8]:
+                for extra in lines[max(0, i - 4):i + 10]:
                     print("::error title=ctx::" + extra.replace('%', '%25')[:900])
                 break
         print("::error title=status::status=" + status)
