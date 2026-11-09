@@ -6,17 +6,42 @@ concurrency:
   group: diag-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  plumb:
+  base:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
-      - name: versions
+      - uses: actions/checkout@v4
+        with:
+          ref: 98176d6fc8680b8d951de750183d7e87f056b158
+      - name: Check out craft-fonts
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+          path: craft-fonts
+      - name: Build with craft-fonts
         run: |
-          curl -sS https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2404-Readme.md > /tmp/img.md || true
+          echo "CRAFT_FONTS_DIR=$GITHUB_WORKSPACE/craft-fonts" >> "$GITHUB_ENV"
+          echo "CRAFT_FONTS_REQUIRED=1" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+      - name: apt
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev qpdf poppler-utils
+      - name: tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.150,cargo-deny@0.20.2
+      - name: gate on the base commit
+        run: |
+          RABICRAFT_ORACLES_REQUIRED=1 CARGO_PROFILE_DEV_DEBUG=line-tables-only cargo xtask ci > /tmp/ci.txt 2>&1 || true
           python3 - <<'PY'
-          lines = open('/tmp/img.md', errors='replace').read().splitlines()
-          hits = [l for l in lines if 'qpdf' in l.lower() or 'poppler' in l.lower()]
-          for l in hits[:10]:
-              print(f"::error title=img::{l.strip().replace('%','%25')[:400]}")
-          print("::error title=count::" + str(len(lines)))
+          import re
+          lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
+          keep = [l for l in lines if '=== ci:' in l or l.startswith('CI:') or re.search(r'^(error|warning)(\[|:)', l)
+                  or 'panicked' in l or 'FAILED' in l or 'left:' in l or 'right:' in l]
+          for l in keep[:50]:
+              print(f"::error title=base::{l.replace('%','%25')[:1000]}")
+          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-20:]))
           PY
