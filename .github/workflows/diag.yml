@@ -18,21 +18,20 @@ jobs:
       linux-env: RABICRAFT_ORACLES_REQUIRED=1
       command: |
         set -uo pipefail
-        cargo xtask ci > /tmp/ci.txt 2>&1
-        status=$?
-        python3 - "$status" <<'PY'
-        import re, sys
-        status = sys.argv[1]
+        cargo xtask ci > /tmp/ci.txt 2>&1 || true
+        python3 - <<'PY'
+        import re
         lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
-        keep = [l for l in lines if '=== ci:' in l]
-        keep += [l for l in lines if re.search(r'^error(\[|:)', l) or 'panicked' in l or 'FAILED' in l or l.startswith('CI:') or l.startswith('error:')]
-        for l in keep[:80]:
-            print("::error title=probe::" + l.replace('%', '%25')[:900])
+        out = []
         for i, l in enumerate(lines):
-            if re.search(r'^error(\[|:)', l):
-                for extra in lines[max(0, i - 4):i + 10]:
-                    print("::error title=ctx::" + extra.replace('%', '%25')[:900])
-                break
-        print("::error title=status::status=" + status)
+            if '=== ci:' in l:
+                out.append(l)
+            if re.search(r'^error(\[|:)|panicked|^FAILED|^ *FAILED|test result: FAILED|^error: ', l):
+                out.extend(lines[max(0, i - 6):i + 12])
+        out.extend(lines[-40:])
+        for l in out:
+            l = re.sub(r'\x1b\[[0-9;]*m', '', l)
+            if l.strip():
+                print("::error title=probe::" + l.replace('%', '%25')[:900])
         PY
         exit 1
