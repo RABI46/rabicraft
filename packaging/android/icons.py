@@ -158,7 +158,29 @@ def drawable(density, viewport, inset, source):
                 die(f"unsupported element {child.tag} in the master")
     if not body:
         die("the master has no drawable shapes")
+    # An adaptive icon draws its background and foreground as separate layers, and the launcher
+    # adds depth (parallax) between them. A full-bleed rectangle in the foreground would cover the
+    # background layer and cancel that, so the tile goes to the background shader instead.
+    full_bleed = [i for i, line in enumerate(body) if _is_full_bleed(line)]
+    for i in reversed(full_bleed):
+        del body[i]
     return HEADER.format(density=density, viewport=viewport) + "\n" + "\n".join(body) + "\n</vector>\n"
+
+
+def _is_full_bleed(path: str) -> bool:
+    """Whether a generated `<path>` covers the whole canvas: the master's background rectangle."""
+    match = re.search(r'android:pathData="M([-\d.]+),([-\d.]+)h([\d.]+)v([\d.]+)h', path)
+    return match is not None and abs(float(match.group(3)) - 512 * SCALE) < 0.01
+
+
+def background() -> str:
+    """The launcher's background layer: the master's own background colour, full bleed."""
+    root = ElementTree.fromstring(SVG.read_text(encoding="utf-8"))
+    group = root.find(f"{SVG_NS}g")
+    for child in (group if group is not None else root):
+        if child.tag == f"{SVG_NS}rect" and (child.get("rx") in (None, "0")):
+            return colour(child.get("fill") or "#000000")
+    die("the master has no full-bleed background rectangle")
 
 
 TARGETS = {
@@ -178,6 +200,11 @@ def main():
         if args.check:
             if not target.is_file() or target.read_text(encoding="utf-8") != text:
                 die(f"{target.relative_to(ROOT)} is out of date: run packaging/android/icons.py")
+            # The background went to the adaptive icon's own layer, from this master: a colour
+            # that drifted from it would show as a seam at the launcher's mask.
+            colors = RES / "values/colors.xml"
+            if not colors.is_file() or f">{background()}<" not in colors.read_text(encoding="utf-8"):
+                die("res/values/colors.xml no longer holds the master's background colour: run packaging/android/icons.py")
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text, encoding="utf-8")

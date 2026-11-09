@@ -20,7 +20,7 @@ android {
         targetSdk = 36
         // Bumped by hand for a fix that must install over the build it replaces; `versionName` comes
         // from Cargo.toml (package.sh sets it).
-        versionCode = 2
+        versionCode = 3
         versionName = "0.17.0"
     }
 

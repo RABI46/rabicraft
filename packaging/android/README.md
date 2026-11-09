@@ -22,8 +22,16 @@ the same for every build (see [Signing](#signing)), so this keeps the app's data
 - **Saving** writes to `Downloads/RabiCraft/<name>.pdf` through MediaStore. Save As creates a new
   file; Save overwrites the one the last save wrote, as on the desktop. The file shows up in Files,
   in the Downloads app and in any picker.
-- **Opening** works from the launcher, from another app's **Open with** and from **Share**. A
-  document RabiCraft was started with is handed to the page as soon as it is ready.
+- **Opening** works from the launcher, from another app's **Open with** and from **Share**, and
+  from **Open** in the app itself, which is the system's file picker: PDFs, and the images and text
+  the browser build turns into PDFs. A document RabiCraft was started with is handed to the page as
+  soon as it is ready.
+- **Files** (the red button over the app's bar) lists what RabiCraft saved: tap one to open it,
+  then send a copy or save it elsewhere. "Elsewhere" and "browse this device" are the system
+  picker, so they reach whatever the phone has mounted. Nothing here talks to Google Drive: the
+  Drive app is one of the providers the picker shows, and RabiCraft needs no account for it.
+- **Exporting** (images, OCR text, CSV, XFDF, a print-ready PDF) writes the file the same way a
+  save does, into `Downloads/RabiCraft`, and says where it went.
 - **Preferences, the workspace and the session** live in the WebView's `localStorage`, which is why
   the app has its own origin (below). **Back** with unsaved work asks before leaving.
 - **Performance**: rendering runs on the phone's GPU through WebGL 2. Large documents are slower
@@ -38,9 +46,10 @@ the same for every build (see [Signing](#signing)), so this keeps the app's data
 |---|---|---|
 | Browser build | `apps/rabicraft-web` → `app/src/main/assets/web` | One implementation: the APK runs what the web release runs. |
 | Its own origin | `MainActivity.Site` serves `https://rabicraft.localhost/` from those assets | `localStorage` is refused to `file://` documents, and any shared origin would let another site reach the app. `*.localhost` resolves to loopback, is a secure context, and needs no network permission. |
-| Framed page | `HostPage.FRAME` = `./index.html?host=parent` | `package.sh` copies trunk's output to the root of `assets/web`, so the site is next to `host.html`. `check-page.py` refuses a build where the two disagree: a frame pointed at a missing file is an empty window and no error at all. |
+| Framed page | `HostPage.FRAME` = `./index.html?host=parent&compact=1` | `package.sh` copies trunk's output to the root of `assets/web`, so the site is next to `host.html`. `check-page.py` refuses a build where the two disagree: a frame pointed at a missing file is an empty window and no error at all. |
 | Host bridge | `HostPage.kt` + `MainActivity.Bridge` | A WebView has no download of its own, so the page's `<a download>` save goes nowhere. Framing it with `?host=parent` makes the page post saves and receive documents instead — the protocol `apps/rabicraft-web/src/main.rs`'s `mod host` already speaks for the Nextcloud app. |
-| Files | MediaStore (`Downloads/RabiCraft`) | No permission, no `MANAGE_EXTERNAL_STORAGE`, visible to the user. |
+| Files | MediaStore (`Downloads/RabiCraft`), plus the system's own document picker (`Chooser`, `Files`) | No permission, no `MANAGE_EXTERNAL_STORAGE`, visible to the user. The picker is Android's, so wherever it can reach (another cloud app, a USB stick, Drive) is where a document can be opened from or copied to. |
+| Phone layout | `?compact=1` → `RabiCraftApp::compact` | One bar (menus behind one button, the four workspaces, open files, Open), finger-high rows, the tools over the page. |
 | Icon | `res/drawable/ic_launcher_foreground.xml` | Generated from `assets/app-icon/rabicraft.svg` by `icons.py`: the master artwork, as a VectorDrawable, so no raster is committed or needs regenerating offline. |
 
 There is **no handwritten JavaScript in the build tree**: the host page is a Kotlin string
@@ -92,6 +101,10 @@ or run `apksigner sign --ks <keystore> --out <apk> <apk>` on the built file.
 `cargo xtask ci` runs the workspace and does not build the APK (no Android SDK on that runner).
 `.github/workflows/android.yml` does: it builds the APK, runs the Kotlin tests of the host page, and
 verifies that `assets/web/index.html` is inside the archive and that the signature verifies.
+
+The Kotlin tests cover the host page's script and the files picker's mapping of the page's
+`accept` list (`ChooserTest`); the phone layout is tested from the Rust side
+(`crates/ui-egui/tests/it/compact.rs`).
 
 Before Gradle runs, `package.sh` refuses three classes of mistake that would otherwise surface on a
 phone: a stale launcher icon (`icons.py --check`), a resource reference with no file behind it

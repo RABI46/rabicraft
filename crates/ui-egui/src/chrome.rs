@@ -30,6 +30,10 @@ const STRIP_BUTTON: f32 = 28.0;
 /// Draw the window's tab strip: home and open controls, shrinkable and scrollable document tabs with drag
 /// reordering, and platform window controls.
 pub fn tab_strip(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
+    if app.compact {
+        compact_bar(app, ui);
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     // macOS: the strip is the 28 pt title bar, so the traffic lights are centred in it; tabs and
     // buttons shrink to keep a margin above and below.
@@ -524,6 +528,102 @@ pub fn mode_bar(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
         });
 }
 
+/// The phone's height for a row a finger touches. Android's own guidance is 48 dp.
+pub(crate) const COMPACT_ROW: f32 = 48.0;
+/// A phone's tools pane, shown over the page instead of beside it.
+pub(crate) const COMPACT_PANE: f32 = 300.0;
+
+/// The phone's only top bar: the menu button, the document tabs, and Open.
+///
+/// A desktop window has room for a menu bar, a tab strip and a mode bar; a phone-wide screen does
+/// not, and a menu bar laid out in a third of its width is a row of "⋯". The menus, the tabs and
+/// the one action that matters without a document all sit here instead, and the tools pane is
+/// opened over the page from the menu.
+fn compact_bar(app: &mut RabiCraftApp, ui: &mut egui::Ui) {
+    let t = Tokens::get(ui.ctx());
+    egui::Panel::top("compact_bar")
+        .exact_size(COMPACT_ROW + 4.0)
+        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 2)).stroke(Stroke::new(1.0, t.divider)))
+        .show(ui, |ui| {
+            ui.horizontal_centered(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                let tip = tl!("Menus, files and tools");
+                let button = icons::button(ui, "ellipsis", 40.0, app.compact_menu, tip);
+                if button.clicked() {
+                    app.compact_menu = !app.compact_menu;
+                }
+                // The sheet hangs under the button, as a menu does.
+                if app.compact_menu_ui(ui, button.rect) {
+                    app.compact_menu = false;
+                }
+                // The workspaces, on the same row: a phone has no room for a second bar, so each
+                // keeps to one word. Read is not here — it is View ▸ Read mode, and a phone that
+                // wants the page alone can also close the tools pane.
+                for (mode, label) in [(Mode::AllTools, "Tools"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")] {
+                    if widgets::mode_tab(ui, tl!(label), app.mode == mode).clicked() {
+                        app.switch_mode(mode, true);
+                    }
+                }
+                ui.separator();
+                // Every open document, by name: a phone has no strip of tabs, so the files are
+                // buttons. Only a second file needs one — the bar has a phone's width for all of
+                // this — and a long name is shortened. In a sheet of their own, so several files
+                // scroll sideways instead of pushing Open off the bar.
+                let active = app.active;
+                let names: Vec<(usize, String, bool)> = app
+                    .views
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| (i, crate::canvas::tab_label(app, i).unwrap_or_else(|| tl!("Untitled").to_owned()), Some(i) == active))
+                    .collect();
+                let mut close = None;
+                let mut chosen = None;
+                if names.len() > 1 {
+                    egui::ScrollArea::horizontal().id_salt("compact_tabs").show(ui, |ui| {
+                        ui.horizontal_centered(|ui| {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            for (i, name, shown) in &names {
+                                let label = short_name(name);
+                                let resp = widgets::mode_tab(ui, &label, *shown).on_hover_text(name);
+                                if resp.clicked() {
+                                    chosen = Some(*i);
+                                }
+                                // A phone has no middle button: holding a tab asks to close it.
+                                if resp.secondary_clicked() {
+                                    close = Some(*i);
+                                }
+                            }
+                        });
+                    });
+                }
+                if let Some(i) = chosen {
+                    app.active = Some(i);
+                }
+                if let Some(i) = close {
+                    app.close_tab(i);
+                }
+                // Open is on the bar with or without a document: it is the one thing a phone
+                // needs before anything else, and a second file is as likely as the first.
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let tip = tl!("Open file");
+                    if icons::button(ui, "folder-open", 40.0, false, tip).clicked() {
+                        app.open_dialog();
+                    }
+                });
+            });
+        });
+}
+
+/// A tab label a phone can hold: a dozen characters, and an ellipsis.
+fn short_name(name: &str) -> String {
+    const PHONE_TAB: usize = 12;
+    let mut out: String = name.chars().take(PHONE_TAB).collect();
+    if name.chars().nth(PHONE_TAB).is_some() {
+        out.push('…');
+    }
+    out
+}
+
 /// The size of the rail's page and zoom fields: wide enough for "6400%", the largest zoom, in the
 /// 12 pt font, and inside the 45 pt the rail leaves.
 const RAIL_FIELD_SIZE: [f32; 2] = [42.0, 22.0];
@@ -898,5 +998,20 @@ mod tab_widths {
         assert_eq!(MAC_CONTENT_LEFT - lights_end, margin);
         // `egui::Margin` is in `i8`.
         assert!(MAC_CONTENT_LEFT <= f32::from(i8::MAX));
+    }
+}
+
+#[cfg(test)]
+mod compact_tests {
+    use super::short_name;
+
+    /// A tab label on a phone: a dozen characters, then an ellipsis; shorter names whole.
+    #[test]
+    fn phone_tab_names_shorten_and_end_in_an_ellipsis() {
+        assert_eq!(short_name("a.pdf"), "a.pdf");
+        assert_eq!(short_name("123456789012"), "123456789012");
+        assert_eq!(short_name("1234567890123"), "123456789012…");
+        // Multibyte names are cut at a character boundary, never inside one.
+        assert_eq!(short_name("ééééééééééééé"), "éééééééééééé…");
     }
 }

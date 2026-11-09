@@ -82,12 +82,12 @@ impl RabiCraftApp {
                     return false;
                 }
             };
-            // An embedding page that asked for saves (`?host=parent`) gets the bytes; otherwise
+            // An embedding page that asked for files (`?host=parent`) gets the bytes; otherwise
             // the browser downloads them.
-            let to_host = self.host_save.is_some();
+            let to_host = self.host_save.is_some() || self.host_download.is_some();
             let delivered = match &self.host_save {
                 Some(save) => save(&name, &bytes, matches!(target, SaveTarget::As)),
-                None => download(&name, &bytes),
+                None => download_with(self.host_download.as_ref(), &name, &bytes),
             };
             match delivered {
                 Ok(()) => {
@@ -301,4 +301,18 @@ pub(crate) fn download(name: &str, bytes: &[u8]) -> Result<(), String> {
     a.click();
     let _ = web_sys::Url::revoke_object_url(&url);
     Ok(())
+}
+
+/// [`download`] for a host page that takes exported files itself (`host_download`).
+///
+/// A page framed with `?host=parent` (the Android WebView, the Nextcloud app) receives a save as a
+/// message instead of a download; an export is another file, named by the workflow rather than by
+/// the document, so it goes to the same host. Without a host the browser downloads it, as before.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn download_with(host: Option<&crate::HostSaveFn>, name: &str, bytes: &[u8]) -> Result<(), String> {
+    // An export is always a new file, never a Save As over one the host already holds.
+    match host {
+        Some(save) => save(name, bytes, true),
+        None => download(name, bytes),
+    }
 }

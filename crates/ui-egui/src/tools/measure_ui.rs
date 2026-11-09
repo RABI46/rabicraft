@@ -619,7 +619,7 @@ fn export_csv(app: &mut RabiCraftApp) {
                 }
             }
             #[cfg(target_arch = "wasm32")]
-            if let Err(e) = crate::editing::download("measurements.csv", csv.as_bytes()) {
+            if let Err(e) = crate::editing::download_with(app.host_download.as_ref(), "measurements.csv", csv.as_bytes()) {
                 app.notify(&e);
             }
         }

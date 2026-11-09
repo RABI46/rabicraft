@@ -317,6 +317,12 @@ impl RabiCraftApp {
         // The document shows, not the expanded All tools view over it (whichever workspace opens).
         if activate {
             self.all_tools_full = false;
+            // And on a phone the page shows, not the tools sheet over it: opening a file prepares
+            // its form and restores its tool, and each of those opens the pane from inside this
+            // call. The sheet belongs to the click that asks for a tool, not to opening a file.
+            if self.compact {
+                self.left_open = false;
+            }
         }
         if activate && let Some(mode) = self.mode_override {
             // Explicit mode options do not reset independent --tool / --left choices.
@@ -324,7 +330,7 @@ impl RabiCraftApp {
         } else if activate && self.mode != self.default_mode {
             // Switch workspace like the mode bar, but a left panel the user (or `--left closed`)
             // closed stays closed, and an unchanged mode keeps the tool panel the user chose.
-            let left_open = self.left_open;
+            let left_open = self.left_open && !self.compact;
             self.select_mode(self.default_mode);
             self.left_open = left_open;
         }

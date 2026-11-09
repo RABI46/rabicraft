@@ -310,7 +310,7 @@ impl RabiCraftApp {
             }
         }
         #[cfg(target_arch = "wasm32")]
-        match crate::editing::download(&name, &bytes) {
+        match crate::editing::download_with(self.host_download.as_ref(), &name, &bytes) {
             Ok(()) => saved(self, name),
             Err(e) => self.notify_fmt("Couldn't download {name}: {e}", &[("name", &name), ("e", &e.to_string())]),
         }

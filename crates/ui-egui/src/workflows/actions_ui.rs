@@ -81,12 +81,26 @@ impl RabiCraftApp {
                 self.ask_one(crate::pickers::Ask::Folder(dialog), None, move |app, dir| app.run_action_into(action, files, dir));
             }
         }
+        // A host page takes each result itself (`host_download`); a browser downloads it. The sink
+        // moves out of the app for the call: the batch runs inside it on the web, and borrowing
+        // the field would borrow `self` twice.
         #[cfg(target_arch = "wasm32")]
-        self.run_action_into(action, files);
+        {
+            let host = self.host_download.take();
+            self.run_action_into(action, files, host.as_ref());
+            self.host_download = host;
+        }
     }
 
     /// [`Self::run_action_on`] once the folder for the results is known.
-    fn run_action_into(&mut self, action: Action, files: Vec<(String, Vec<u8>)>, #[cfg(not(target_arch = "wasm32"))] dir: std::path::PathBuf) {
+    fn run_action_into(
+        &mut self,
+        action: Action,
+        files: Vec<(String, Vec<u8>)>,
+        #[cfg(not(target_arch = "wasm32"))] dir: std::path::PathBuf,
+        // The page's own file sink: an `<a download>` reaches nothing in a WebView.
+        #[cfg(target_arch = "wasm32")] host: Option<&crate::HostSaveFn>,
+    ) {
         // Another run may have started while the folder picker was open.
         if self.action_run.is_some() {
             self.notify_tr("An action is already running");
@@ -106,8 +120,9 @@ impl RabiCraftApp {
                 let r = rabicraft_engine::actions::run_on(&action, &name, Arc::new(bytes), |_, _| {}).and_then(|r| {
                     #[cfg(not(target_arch = "wasm32"))]
                     write_result(&dir, &name, &r.bytes).map_err(|e| e.to_string())?;
+                    // A host page takes the file itself; a browser downloads it.
                     #[cfg(target_arch = "wasm32")]
-                    crate::editing::download(&name, &r.bytes)?;
+                    crate::editing::download_with(host, &name, &r.bytes)?;
                     Ok(())
                 });
                 match r {

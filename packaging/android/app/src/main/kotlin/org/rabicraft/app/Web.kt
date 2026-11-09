@@ -11,6 +11,9 @@ import java.io.ByteArrayInputStream
  */
 internal fun mime(path: String): String =
     when (path.substringAfterLast('/').substringAfterLast('.', "").lowercase()) {
+        // Documents a picker can be narrowed to; the asset types below are the page's.
+        "pdf" -> "application/pdf"
+        "txt" -> "text/plain"
         "html", "htm" -> "text/html"
         "js", "mjs" -> "text/javascript"
         "wasm" -> "application/wasm"
