@@ -12,6 +12,11 @@ jobs:
     steps:
       - name: versions
         run: |
-          curl -sS https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2404-Readme.md | grep -iE "qpdf|poppler|^### |nextest" | head -40
-      - name: toolchain file
-        run: echo ok
+          curl -sS https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2404-Readme.md > /tmp/img.md || true
+          python3 - <<'PY'
+          lines = open('/tmp/img.md', errors='replace').read().splitlines()
+          hits = [l for l in lines if 'qpdf' in l.lower() or 'poppler' in l.lower()]
+          for l in hits[:10]:
+              print(f"::error title=img::{l.strip().replace('%','%25')[:400]}")
+          print("::error title=count::" + str(len(lines)))
+          PY
