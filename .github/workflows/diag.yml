@@ -5,41 +5,42 @@ permissions:
 concurrency:
   group: diag-${{ github.ref }}
   cancel-in-progress: true
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 jobs:
-  gate:
+  kotlin:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Check out craft-fonts
-        uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          repository: storytold/craft-fonts
-          ref: b076417b5880bd4154bd22f00695b1d28c6bea83
-          path: craft-fonts
-      - name: Build with craft-fonts
+          distribution: temurin
+          java-version: "17"
+      - name: sdk
         run: |
-          echo "CRAFT_FONTS_DIR=$GITHUB_WORKSPACE/craft-fonts" >> "$GITHUB_ENV"
-          echo "CRAFT_FONTS_REQUIRED=1" >> "$GITHUB_ENV"
-      - uses: dtolnay/rust-toolchain@stable
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools" >/dev/null
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          components: clippy, rustfmt
-          targets: wasm32-unknown-unknown
-      - name: apt
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev qpdf poppler-utils
-      - name: tools
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest@0.9.150,cargo-deny@0.20.2
-      - name: gate
+          gradle-version: "8.14.3"
+      - name: tests
         run: |
-          RABICRAFT_ORACLES_REQUIRED=1 cargo xtask ci > /tmp/ci.txt 2>&1 || true
+          mkdir -p packaging/android/app/src/main/assets/web
+          (cd packaging/android && gradle --no-daemon :app:testDebugUnitTest) > /tmp/kt.txt 2>&1 || true
           python3 - <<'PY'
-          import re
-          lines = open('/tmp/ci.txt', errors='replace').read().splitlines()
-          keep = [l for l in lines if '=== ci:' in l or l.startswith('CI:') or re.search(r'^(error|warning)(\[|:)', l)
-                  or 'panicked' in l or 'FAILED' in l or 'left:' in l or 'right:' in l or 'assert' in l]
-          for l in keep[:50]:
-              print(f"::error title=ci::{l.replace('%','%25')[:1000]}")
-          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-25:]))
+          import glob, re
+          lines = open('/tmp/kt.txt', errors='replace').read().splitlines()
+          keep = [l for l in lines if 'FAILED' in l or 'e: ' in l or 'error:' in l or 'Test' in l and '>' in l]
+          for l in keep[:40]:
+              print(f"::error title=kt::{l.replace('%','%25')[:1000]}")
+          for f in sorted(glob.glob('packaging/android/app/build/reports/tests/**/*.html', recursive=True))[:0]:
+              pass
+          for f in sorted(glob.glob('packaging/android/app/build/test-results/**/*.xml', recursive=True)):
+              text = open(f, errors='replace').read()
+              for m in re.finditer(r'<testcase name="([^"]+)"[^>]*>\s*<failure[^>]*>(.{0,600})', text, re.S):
+                  msg = (m.group(1) + ' :: ' + m.group(2)).replace('\n', ' ')
+                  print(f"::error title=fail::{msg.replace('%','%25')[:1000]}")
+          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-15:]))
           PY
