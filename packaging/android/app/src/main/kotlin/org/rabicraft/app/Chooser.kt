@@ -85,8 +85,11 @@ internal class Chooser(private val activity: MainActivity) : WebChromeClient() {
          * input asked for several.
          */
         fun plan(accepted: Array<String>?, mode: Int): Pick {
+            // A WebView hands the whole attribute over, so one entry can be `application/pdf,image/*`:
+            // split every entry, not only the first comma of the first.
             val types = accepted.orEmpty()
-                .map { it.trim().substringBefore(',') }
+                .flatMap { it.split(',') }
+                .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .map { if (it.startsWith('.')) mime(it) else it }
                 .filter { it == "*/*" || it.contains('/') }

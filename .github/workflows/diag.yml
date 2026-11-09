@@ -28,19 +28,15 @@ jobs:
       - name: tests
         run: |
           mkdir -p packaging/android/app/src/main/assets/web
+          printf '<html><body><div id="rabicraft"></div></body></html>' > packaging/android/app/src/main/assets/web/index.html
           (cd packaging/android && gradle --no-daemon :app:testDebugUnitTest) > /tmp/kt.txt 2>&1 || true
           python3 - <<'PY'
           import glob, re
           lines = open('/tmp/kt.txt', errors='replace').read().splitlines()
-          keep = [l for l in lines if 'FAILED' in l or 'e: ' in l or 'error:' in l or 'Test' in l and '>' in l]
-          for l in keep[:40]:
+          for l in [x for x in lines if 'FAILED' in x or 'e: ' in x][:20]:
               print(f"::error title=kt::{l.replace('%','%25')[:1000]}")
-          for f in sorted(glob.glob('packaging/android/app/build/reports/tests/**/*.html', recursive=True))[:0]:
-              pass
           for f in sorted(glob.glob('packaging/android/app/build/test-results/**/*.xml', recursive=True)):
-              text = open(f, errors='replace').read()
-              for m in re.finditer(r'<testcase name="([^"]+)"[^>]*>\s*<failure[^>]*>(.{0,600})', text, re.S):
-                  msg = (m.group(1) + ' :: ' + m.group(2)).replace('\n', ' ')
-                  print(f"::error title=fail::{msg.replace('%','%25')[:1000]}")
-          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:180] for x in lines[-15:]))
+              for m in re.finditer(r'<testcase name="([^"]+)"[^>]*>\s*<failure[^>]*>(.{0,500})', open(f, errors='replace').read(), re.S):
+                  print(f"::error title=fail::" + (m.group(1) + ' :: ' + m.group(2)).replace('\n',' ').replace('%','%25')[:1000])
+          print("::error title=tail::" + ' | '.join(x.replace('%','%25')[:160] for x in lines[-8:]))
           PY
