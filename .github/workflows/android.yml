@@ -45,7 +45,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check out craft-i18n
-        uses: storytold/craft-common-actions/actions/checkout-craft-i18n@eddaf203b2d4873525a69842240214b23bac65ba
+        uses: storytold/craft-common-actions/actions/checkout-craft-i18n@fd14193f062cd71f9de9426bd450aa0adad670f0
       - name: Install Rust
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
@@ -60,7 +60,7 @@ jobs:
             | tar -xz -C /usr/local/bin trunk
           trunk --version
       - name: Install Java
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: "17"
