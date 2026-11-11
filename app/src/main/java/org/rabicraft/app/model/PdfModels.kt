@@ -110,6 +110,7 @@ data class FormFieldItem(
 )
 
 enum class WorkbenchMode {
+    LIBRARY,
     READ,
     ORGANIZE,
     ANNOTATE,

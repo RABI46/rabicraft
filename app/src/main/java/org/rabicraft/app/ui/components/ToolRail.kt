@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesomeMotion
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Icon
@@ -27,6 +28,17 @@ fun ToolRail(
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
+        NavigationBarItem(
+            selected = activeMode == WorkbenchMode.LIBRARY,
+            onClick = { onSelectMode(WorkbenchMode.LIBRARY) },
+            icon = { Icon(Icons.Default.FolderOpen, contentDescription = "Files") },
+            label = { Text("Files", fontWeight = FontWeight.Medium) },
+            modifier = Modifier.testTag("mode_library"),
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        )
+
         NavigationBarItem(
             selected = activeMode == WorkbenchMode.READ,
             onClick = { onSelectMode(WorkbenchMode.READ) },

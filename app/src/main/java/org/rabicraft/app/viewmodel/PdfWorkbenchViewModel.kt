@@ -9,6 +9,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.rabicraft.app.data.DocumentRepository
+import org.rabicraft.app.data.local.DocumentEntity
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import org.rabicraft.app.data.PdfRepository
 import org.rabicraft.app.model.AnnotationItem
 import org.rabicraft.app.model.AnnotationType
@@ -29,9 +33,16 @@ import java.util.UUID
 class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = PdfRepository(application.applicationContext)
+    private val documentRepository = DocumentRepository(application.applicationContext)
+
+    val documents: StateFlow<List<DocumentEntity>> = documentRepository.allDocuments
+    val groups: StateFlow<List<String>> = documentRepository.distinctGroups
 
     private val _documentInfo = MutableStateFlow<PdfDocumentInfo?>(null)
     val documentInfo: StateFlow<PdfDocumentInfo?> = _documentInfo.asStateFlow()
+
+    private val _activePdfFile = MutableStateFlow<File?>(null)
+    val activePdfFile: StateFlow<File?> = _activePdfFile.asStateFlow()
 
     private val _pages = MutableStateFlow<List<PageItem>>(emptyList())
     val pages: StateFlow<List<PageItem>> = _pages.asStateFlow()
@@ -113,13 +124,19 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
             try {
                 val (doc, pageList) = repository.loadShowcase()
                 _documentInfo.value = doc
+                val activeF = repository.getActivePdfFile()
+                _activePdfFile.value = activeF
+                if (activeF != null) {
+                    documentRepository.ensureShowcaseDocument(activeF)
+                }
                 _pages.value = pageList
                 _bookmarks.value = repository.sampleBookmarks
                 _currentPageIndex.value = 0
                 initializeSampleData()
                 preloadBitmaps(pageList)
                 _statusMessage.value = "Loaded specimen: ${doc.name}"
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                e.printStackTrace()
                 _statusMessage.value = "Failed to load showcase: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -133,6 +150,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
             try {
                 val (doc, pageList) = repository.loadFromUri(uri)
                 _documentInfo.value = doc
+                _activePdfFile.value = repository.getActivePdfFile()
                 _pages.value = pageList
                 _bookmarks.value = listOf(BookmarkItem("bm-root", doc.name, 0))
                 _currentPageIndex.value = 0
@@ -141,7 +159,8 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
                 _formFields.value = emptyList()
                 preloadBitmaps(pageList)
                 _statusMessage.value = "Opened ${doc.name}"
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                e.printStackTrace()
                 _statusMessage.value = "Error opening PDF: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -153,7 +172,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             val map = mutableMapOf<Int, Bitmap>()
             for (p in pageList) {
-                val bmp = repository.renderPageBitmap(p.originalPageIndex, p.rotationDegrees, scale = 1.3f)
+                val bmp = repository.renderPageBitmap(p.originalPageIndex, p.rotationDegrees, scale = 0.6f)
                 if (bmp != null) {
                     map[p.pageIndex] = bmp
                 }
@@ -246,7 +265,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
         _pages.value = currentList
 
         viewModelScope.launch {
-            val bmp = repository.renderPageBitmap(page.originalPageIndex, newRotation, scale = 1.3f)
+            val bmp = repository.renderPageBitmap(page.originalPageIndex, newRotation, scale = 0.6f)
             if (bmp != null) {
                 val currentMap = _pageBitmaps.value.toMutableMap()
                 currentMap[pageIndex] = bmp
@@ -268,7 +287,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             val newMap = mutableMapOf<Int, Bitmap>()
             for (p in reindexed) {
-                val bmp = repository.renderPageBitmap(p.originalPageIndex, p.rotationDegrees, scale = 1.3f)
+                val bmp = repository.renderPageBitmap(p.originalPageIndex, p.rotationDegrees, scale = 0.6f)
                 if (bmp != null) newMap[p.pageIndex] = bmp
             }
             _pageBitmaps.value = newMap
@@ -488,6 +507,113 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
 
     fun clearStatusMessage() {
         _statusMessage.value = null
+    }
+
+    fun importDocument(uri: Uri, name: String? = null, group: String = "General", tags: List<String> = emptyList()) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val entity = documentRepository.importDocument(uri, name, group, tags)
+                val targetFile = File(entity.filePath)
+                val (doc, pageList) = repository.loadFromUri(Uri.fromFile(targetFile))
+                _documentInfo.value = doc.copy(name = entity.name)
+                _activePdfFile.value = targetFile
+                _pages.value = pageList
+                _bookmarks.value = listOf(BookmarkItem("bm-root", entity.name, 0))
+                _currentPageIndex.value = 0
+                _workbenchMode.value = WorkbenchMode.READ
+                preloadBitmaps(pageList)
+                _statusMessage.value = "Imported '${entity.name}' to '${entity.groupName}'"
+            } catch (e: Exception) {
+                _statusMessage.value = "Import failed: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun openDocumentFromLibrary(entity: DocumentEntity) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val file = File(entity.filePath)
+                if (file.exists()) {
+                    documentRepository.updateLastOpened(entity.id)
+                    val (doc, pageList) = repository.loadFromUri(Uri.fromFile(file))
+                    _documentInfo.value = doc.copy(name = entity.name)
+                    _activePdfFile.value = file
+                    _pages.value = pageList
+                    _bookmarks.value = if (entity.isSample) repository.sampleBookmarks else listOf(BookmarkItem("bm-root", entity.name, 0))
+                    _currentPageIndex.value = 0
+                    _workbenchMode.value = WorkbenchMode.READ
+                    preloadBitmaps(pageList)
+                    _statusMessage.value = "Opened '${entity.name}'"
+                } else {
+                    _statusMessage.value = "File not found: ${entity.name}"
+                }
+            } catch (e: Exception) {
+                _statusMessage.value = "Error opening document: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun renameDocument(id: String, newName: String) {
+        viewModelScope.launch {
+            try {
+                documentRepository.renameDocument(id, newName)
+                if (_documentInfo.value?.id == id) {
+                    _documentInfo.value = _documentInfo.value?.copy(name = newName)
+                }
+                _statusMessage.value = "Renamed to '$newName'"
+            } catch (e: Exception) {
+                _statusMessage.value = "Rename failed: ${e.message}"
+            }
+        }
+    }
+
+    fun updateDocumentGroup(id: String, newGroup: String) {
+        viewModelScope.launch {
+            try {
+                documentRepository.updateGroup(id, newGroup)
+                _statusMessage.value = "Moved to group '$newGroup'"
+            } catch (e: Exception) {
+                _statusMessage.value = "Group update failed: ${e.message}"
+            }
+        }
+    }
+
+    fun updateDocumentTags(id: String, tags: List<String>) {
+        viewModelScope.launch {
+            try {
+                documentRepository.updateTags(id, tags)
+                _statusMessage.value = "Tags updated"
+            } catch (e: Exception) {
+                _statusMessage.value = "Tag update failed: ${e.message}"
+            }
+        }
+    }
+
+    fun toggleDocumentStarred(id: String, currentStarred: Boolean) {
+        viewModelScope.launch {
+            try {
+                documentRepository.toggleStarred(id, currentStarred)
+            } catch (e: Exception) {
+                _statusMessage.value = "Star update failed: ${e.message}"
+            }
+        }
+    }
+
+    fun deleteDocument(id: String) {
+        viewModelScope.launch {
+            try {
+                documentRepository.deleteDocument(id)
+                _statusMessage.value = "Document deleted"
+            } catch (e: Exception) {
+                _statusMessage.value = "Delete failed: ${e.message}"
+            }
+        }
     }
 
     override fun onCleared() {

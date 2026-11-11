@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -48,6 +49,7 @@ fun TopBar(
     onCycleReadingTheme: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenInspector: () -> Unit,
+    onOpenDocument: () -> Unit,
     onShare: () -> Unit
 ) {
     TopAppBar(
@@ -84,6 +86,13 @@ fun TopBar(
             }
         },
         actions = {
+            IconButton(
+                onClick = onOpenDocument,
+                modifier = Modifier.testTag("open_document_button")
+            ) {
+                Icon(Icons.Default.FolderOpen, contentDescription = "Open PDF")
+            }
+
             IconButton(
                 onClick = onZoomOut,
                 modifier = Modifier.testTag("zoom_out_button")

@@ -24,6 +24,8 @@ class PdfRepository(private val context: Context) {
     private var currentRenderer: PdfRenderer? = null
     private var activePdfFile: File? = null
 
+    fun getActivePdfFile(): File? = activePdfFile
+
     val sampleBookmarks = listOf(
         BookmarkItem(
             id = "bm-1",
@@ -89,10 +91,20 @@ class PdfRepository(private val context: Context) {
         closeCurrentRenderer()
         activePdfFile = file
 
-        val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-        currentFileDescriptor = pfd
-        val renderer = PdfRenderer(pfd)
-        currentRenderer = renderer
+        var pfd: ParcelFileDescriptor? = null
+        var renderer: PdfRenderer? = null
+        try {
+            pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            renderer = PdfRenderer(pfd)
+            currentFileDescriptor = pfd
+            currentRenderer = renderer
+        } catch (e: Throwable) {
+            try { renderer?.close() } catch (_: Throwable) {}
+            try { pfd?.close() } catch (_: Throwable) {}
+            currentRenderer = null
+            currentFileDescriptor = null
+            throw IllegalStateException("Failed to initialize PDF renderer: ${e.message}", e)
+        }
 
         val pageCount = renderer.pageCount
         val pages = mutableListOf<PageItem>()
@@ -106,10 +118,20 @@ class PdfRepository(private val context: Context) {
         )
 
         for (i in 0 until pageCount) {
-            val page = renderer.openPage(i)
-            val w = page.width
-            val h = page.height
-            page.close()
+            var w = 595
+            var h = 842
+            var page: PdfRenderer.Page? = null
+            try {
+                page = renderer.openPage(i)
+                w = page.width
+                h = page.height
+            } catch (e: Throwable) {
+                e.printStackTrace()
+            } finally {
+                try {
+                    page?.close()
+                } catch (_: Throwable) {}
+            }
 
             val label = if (i == 0) "Cover" else "$i"
             val textContent = if (i < defaultTexts.size) defaultTexts[i] else "Page $i content"
@@ -147,22 +169,22 @@ class PdfRepository(private val context: Context) {
     suspend fun renderPageBitmap(
         pageIndex: Int,
         rotationDegrees: Int = 0,
-        scale: Float = 1.5f
+        scale: Float = 1.0f
     ): Bitmap? = withContext(Dispatchers.IO) {
         val renderer = currentRenderer ?: return@withContext null
         if (pageIndex < 0 || pageIndex >= renderer.pageCount) return@withContext null
 
         synchronized(renderer) {
+            var page: PdfRenderer.Page? = null
             try {
-                val page = renderer.openPage(pageIndex)
-                val targetW = (page.width * scale).toInt().coerceAtLeast(100)
-                val targetH = (page.height * scale).toInt().coerceAtLeast(100)
+                page = renderer.openPage(pageIndex)
+                val targetW = (page.width * scale).toInt().coerceIn(80, 2048)
+                val targetH = (page.height * scale).toInt().coerceIn(80, 2048)
 
                 val bitmap = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
                 bitmap.eraseColor(Color.WHITE)
 
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                page.close()
 
                 if (rotationDegrees % 360 != 0) {
                     val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
@@ -172,9 +194,13 @@ class PdfRepository(private val context: Context) {
                 } else {
                     bitmap
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
                 null
+            } finally {
+                try {
+                    page?.close()
+                } catch (_: Throwable) {}
             }
         }
     }
@@ -235,22 +261,31 @@ class PdfRepository(private val context: Context) {
 
             // Append pages from doc 2
             for (i in 0 until renderer2.pageCount) {
-                val page = renderer2.openPage(i)
-                val w = (page.width * 1.5f).toInt()
-                val h = (page.height * 1.5f).toInt()
-                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                page.close()
+                var page: PdfRenderer.Page? = null
+                var bmp: Bitmap? = null
+                try {
+                    page = renderer2.openPage(i)
+                    val w = (page.width * 1.5f).toInt().coerceIn(80, 2048)
+                    val h = (page.height * 1.5f).toInt().coerceIn(80, 2048)
+                    bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                } finally {
+                    try { page?.close() } catch (_: Throwable) {}
+                }
 
-                val pageInfo = PdfDocument.PageInfo.Builder(w, h, pageCounter++).create()
-                val p = combinedPdf.startPage(pageInfo)
-                p.canvas.drawBitmap(bmp, 0f, 0f, null)
-                combinedPdf.finishPage(p)
-                bmp.recycle()
+                if (bmp != null) {
+                    val pageInfo = PdfDocument.PageInfo.Builder(bmp.width, bmp.height, pageCounter++).create()
+                    val p = combinedPdf.startPage(pageInfo)
+                    p.canvas.drawBitmap(bmp, 0f, 0f, null)
+                    combinedPdf.finishPage(p)
+                    bmp.recycle()
+                }
             }
 
-            renderer2.close()
-            pfd2.close()
+            try { renderer2.close() } catch (_: Throwable) {}
+            try { pfd2.close() } catch (_: Throwable) {}
 
             FileOutputStream(targetFile).use { out ->
                 combinedPdf.writeTo(out)

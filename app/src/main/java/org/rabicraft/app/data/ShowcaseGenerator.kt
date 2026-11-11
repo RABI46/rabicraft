@@ -14,8 +14,27 @@ object ShowcaseGenerator {
 
     fun generateShowcasePdf(context: Context): File {
         val targetFile = File(context.cacheDir, "RabiCraft_Showcase.pdf")
-        if (targetFile.exists() && targetFile.length() > 0) {
-            return targetFile
+        if (targetFile.exists() && targetFile.length() > 500) {
+            var isValid = false
+            try {
+                val pfd = android.os.ParcelFileDescriptor.open(targetFile, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+                val testRenderer = android.graphics.pdf.PdfRenderer(pfd)
+                if (testRenderer.pageCount >= 5) {
+                    isValid = true
+                }
+                testRenderer.close()
+                pfd.close()
+            } catch (_: Throwable) {
+                targetFile.delete()
+            }
+            if (isValid) {
+                return targetFile
+            }
+        }
+
+        val tempFile = File(context.cacheDir, "RabiCraft_Showcase.pdf.tmp")
+        if (tempFile.exists()) {
+            tempFile.delete()
         }
 
         val pdfDocument = PdfDocument()
@@ -52,10 +71,20 @@ object ShowcaseGenerator {
         drawVectorStandardsPage(page5.canvas, pageWidth, pageHeight)
         pdfDocument.finishPage(page5)
 
-        FileOutputStream(targetFile).use { out ->
-            pdfDocument.writeTo(out)
+        try {
+            FileOutputStream(tempFile).use { out ->
+                pdfDocument.writeTo(out)
+            }
+            pdfDocument.close()
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+            tempFile.renameTo(targetFile)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            try { pdfDocument.close() } catch (_: Throwable) {}
         }
-        pdfDocument.close()
+
         return targetFile
     }
 

@@ -39,6 +39,7 @@ import org.rabicraft.app.ui.components.SearchOverlay
 import org.rabicraft.app.ui.components.SignaturePadDialog
 import org.rabicraft.app.ui.components.ToolRail
 import org.rabicraft.app.ui.components.TopBar
+import org.rabicraft.app.ui.screens.DocumentLibraryScreen
 import org.rabicraft.app.ui.screens.OrganizeScreen
 import org.rabicraft.app.ui.screens.ProtectScreen
 import org.rabicraft.app.ui.screens.ViewerScreen
@@ -100,6 +101,9 @@ fun MainAppScreen(
     onShareFile: (File) -> Unit
 ) {
     val documentInfo by viewModel.documentInfo.collectAsStateWithLifecycle()
+    val activePdfFile by viewModel.activePdfFile.collectAsStateWithLifecycle()
+    val documents by viewModel.documents.collectAsStateWithLifecycle()
+    val groups by viewModel.groups.collectAsStateWithLifecycle()
     val pages by viewModel.pages.collectAsStateWithLifecycle()
     val pageBitmaps by viewModel.pageBitmaps.collectAsStateWithLifecycle()
     val currentPageIndex by viewModel.currentPageIndex.collectAsStateWithLifecycle()
@@ -132,7 +136,7 @@ fun MainAppScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { viewModel.loadDocumentFromUri(it) }
+        uri?.let { viewModel.importDocument(it) }
     }
 
     LaunchedEffect(statusMessage) {
@@ -173,6 +177,7 @@ fun MainAppScreen(
                 },
                 onOpenSearch = { showSearchOverlay = !showSearchOverlay },
                 onOpenInspector = { showInspector = true },
+                onOpenDocument = { onOpenDocumentPicker(filePickerLauncher) },
                 onShare = {
                     viewModel.exportDocument { file ->
                         if (file != null) onShareFile(file)
@@ -193,8 +198,23 @@ fun MainAppScreen(
                 .padding(innerPadding)
         ) {
             when (workbenchMode) {
+                WorkbenchMode.LIBRARY -> {
+                    DocumentLibraryScreen(
+                        documents = documents,
+                        groups = groups,
+                        onOpenDocument = { doc -> viewModel.openDocumentFromLibrary(doc) },
+                        onImportDocument = { onOpenDocumentPicker(filePickerLauncher) },
+                        onRenameDocument = { id, newName -> viewModel.renameDocument(id, newName) },
+                        onUpdateGroup = { id, newGroup -> viewModel.updateDocumentGroup(id, newGroup) },
+                        onUpdateTags = { id, tags -> viewModel.updateDocumentTags(id, tags) },
+                        onToggleStarred = { id, currentStarred -> viewModel.toggleDocumentStarred(id, currentStarred) },
+                        onDeleteDocument = { id -> viewModel.deleteDocument(id) }
+                    )
+                }
+
                 WorkbenchMode.READ, WorkbenchMode.ANNOTATE, WorkbenchMode.FILL_SIGN -> {
                     ViewerScreen(
+                        pdfFile = activePdfFile,
                         pages = pages,
                         currentPageIndex = currentPageIndex,
                         pageBitmaps = pageBitmaps,
