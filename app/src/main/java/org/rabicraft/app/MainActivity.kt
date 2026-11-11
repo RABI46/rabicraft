@@ -20,6 +20,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,9 +33,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.ReadingTheme
 import org.rabicraft.app.model.WorkbenchMode
+import org.rabicraft.app.data.AppLanguage
+import org.rabicraft.app.ui.components.AddTextDialog
 import org.rabicraft.app.ui.components.CombineSplitDialog
 import org.rabicraft.app.ui.components.CommentsSheet
+import org.rabicraft.app.ui.components.EditAction
 import org.rabicraft.app.ui.components.InspectorDialog
+import org.rabicraft.app.ui.components.LanguageDialog
 import org.rabicraft.app.ui.components.SearchOverlay
 import org.rabicraft.app.ui.components.SignaturePadDialog
 import org.rabicraft.app.ui.components.ToolRail
@@ -42,6 +47,8 @@ import org.rabicraft.app.ui.components.TopBar
 import org.rabicraft.app.ui.screens.DocumentLibraryScreen
 import org.rabicraft.app.ui.screens.OrganizeScreen
 import org.rabicraft.app.ui.screens.ProtectScreen
+import org.rabicraft.app.ui.i18n.LocalStrings
+import org.rabicraft.app.ui.i18n.stringsFor
 import org.rabicraft.app.ui.screens.ViewerScreen
 import org.rabicraft.app.ui.theme.RabiCraftTheme
 import org.rabicraft.app.viewmodel.PdfWorkbenchViewModel
@@ -61,16 +68,19 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            val language by viewModel.language.collectAsStateWithLifecycle()
             RabiCraftTheme {
-                MainAppScreen(
-                    viewModel = viewModel,
-                    onOpenDocumentPicker = { launcher ->
-                        launcher.launch(arrayOf("application/pdf"))
-                    },
-                    onShareFile = { file ->
-                        sharePdfFile(file)
-                    }
-                )
+                CompositionLocalProvider(LocalStrings provides stringsFor(language)) {
+                    MainAppScreen(
+                        viewModel = viewModel,
+                        onOpenDocumentPicker = { launcher ->
+                            launcher.launch(arrayOf("application/pdf"))
+                        },
+                        onShareFile = { file ->
+                            sharePdfFile(file)
+                        }
+                    )
+                }
             }
         }
     }
@@ -123,6 +133,9 @@ fun MainAppScreen(
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
+    val edits by viewModel.edits.collectAsStateWithLifecycle()
+    val selectedEditId by viewModel.selectedEditId.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -132,6 +145,14 @@ fun MainAppScreen(
     var showCommentsSheet by remember { mutableStateOf(false) }
     var showCombineSplit by remember { mutableStateOf(false) }
     var showSearchOverlay by remember { mutableStateOf(false) }
+    var showTextDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.addImageEdit(it) }
+    }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -178,6 +199,7 @@ fun MainAppScreen(
                 onOpenSearch = { showSearchOverlay = !showSearchOverlay },
                 onOpenInspector = { showInspector = true },
                 onOpenDocument = { onOpenDocumentPicker(filePickerLauncher) },
+                onOpenLanguage = { showLanguageDialog = true },
                 onShare = {
                     viewModel.exportDocument { file ->
                         if (file != null) onShareFile(file)
@@ -212,7 +234,7 @@ fun MainAppScreen(
                     )
                 }
 
-                WorkbenchMode.READ, WorkbenchMode.ANNOTATE, WorkbenchMode.FILL_SIGN -> {
+                WorkbenchMode.READ, WorkbenchMode.ANNOTATE, WorkbenchMode.EDIT, WorkbenchMode.FILL_SIGN -> {
                     ViewerScreen(
                         pdfFile = activePdfFile,
                         pages = pages,
@@ -228,6 +250,20 @@ fun MainAppScreen(
                         activeAnnotType = activeAnnotType,
                         penColor = penColor,
                         strokeWidth = strokeWidth,
+                        edits = edits,
+                        selectedEditId = selectedEditId,
+                        onSelectEdit = { viewModel.selectEdit(it) },
+                        onMoveEdit = { id, dx, dy -> viewModel.moveEdit(id, dx, dy) },
+                        onEditAction = { action ->
+                            when (action) {
+                                EditAction.ADD_TEXT -> showTextDialog = true
+                                EditAction.ADD_IMAGE -> imagePickerLauncher.launch("image/*")
+                                EditAction.ADD_SHAPE -> viewModel.addShapeEdit(currentPageIndex)
+                                EditAction.WHITEOUT -> viewModel.addWhiteoutEdit(currentPageIndex)
+                                EditAction.DELETE_SELECTED -> viewModel.removeSelectedEdit()
+                                EditAction.CLEAR_PAGE -> viewModel.clearPageEdits(currentPageIndex)
+                            }
+                        },
                         onSelectPage = { viewModel.setCurrentPage(it) },
                         onAddAnnotation = { pageIdx, annot -> viewModel.addAnnotation(pageIdx, annot) },
                         onClearAnnotations = { viewModel.clearAnnotations(it) },
@@ -351,6 +387,27 @@ fun MainAppScreen(
                     if (file != null) onShareFile(file)
                 }
             }
+        )
+    }
+
+    if (showTextDialog) {
+        AddTextDialog(
+            onDismiss = { showTextDialog = false },
+            onAdd = { text, color ->
+                viewModel.addTextEdit(currentPageIndex, text, color)
+                showTextDialog = false
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
+        LanguageDialog(
+            current = language,
+            onSelect = { selected ->
+                viewModel.setLanguage(selected)
+                showLanguageDialog = false
+            },
+            onDismiss = { showLanguageDialog = false }
         )
     }
 }

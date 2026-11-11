@@ -2,16 +2,26 @@ package org.rabicraft.app.data
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.rabicraft.app.data.export.OverlayOp
+import org.rabicraft.app.data.export.PageExportPlan
+import org.rabicraft.app.model.AnnotationItem
 import org.rabicraft.app.model.BookmarkItem
 import org.rabicraft.app.model.DocumentPermissions
+import org.rabicraft.app.model.FormFieldItem
+import org.rabicraft.app.model.PageEdit
 import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PdfDocumentInfo
 import java.io.File
@@ -207,9 +217,14 @@ class PdfRepository(private val context: Context) {
 
     suspend fun exportCurrentDocument(
         pages: List<PageItem>,
+        annotations: Map<Int, List<AnnotationItem>>,
+        edits: Map<Int, List<PageEdit>>,
+        formFields: List<FormFieldItem>,
         targetFile: File
     ): Boolean = withContext(Dispatchers.IO) {
         val renderer = currentRenderer ?: return@withContext false
+        val scale = 2.0f
+
         try {
             val newPdf = PdfDocument()
 
@@ -217,10 +232,34 @@ class PdfRepository(private val context: Context) {
                 val origIdx = pageItem.originalPageIndex
                 if (origIdx >= renderer.pageCount) continue
 
-                val bitmap = renderPageBitmap(origIdx, pageItem.rotationDegrees, scale = 2.0f) ?: continue
-                val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, newIdx + 1).create()
+                val bitmap = renderPageBitmap(origIdx, pageItem.rotationDegrees, scale = scale) ?: continue
+                val pageWidth = bitmap.width.toFloat()
+                val pageHeight = bitmap.height.toFloat()
+
+                // Flatten annotations, form values and edit overlays into the page bitmap.
+                val overlay = Canvas(bitmap)
+                for (op in PageExportPlan.overlayOps(
+                    pageWidth = pageWidth,
+                    pageHeight = pageHeight,
+                    scale = scale,
+                    annotations = annotations[pageItem.pageIndex].orEmpty(),
+                    formFields = formFields.filter { it.pageIndex == pageItem.pageIndex },
+                    edits = edits[pageItem.pageIndex].orEmpty()
+                )) {
+                    drawOverlayOp(overlay, op)
+                }
+
+                // PageInfo is measured in PDF points; the bitmap is rendered at 2x.
+                val (pageWidthPt, pageHeightPt) =
+                    PageExportPlan.pageSizeInPoints(bitmap.width, bitmap.height, scale)
+                val pageInfo = PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, newIdx + 1).create()
                 val page = newPdf.startPage(pageInfo)
-                page.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                page.canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(0f, 0f, pageWidthPt.toFloat(), pageHeightPt.toFloat()),
+                    null
+                )
                 newPdf.finishPage(page)
                 bitmap.recycle()
             }
@@ -233,6 +272,91 @@ class PdfRepository(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    private fun drawOverlayOp(canvas: Canvas, op: OverlayOp) {
+        when (op) {
+            is OverlayOp.Ink -> {
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = op.colorArgb.toInt()
+                    style = Paint.Style.STROKE
+                    strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
+                    strokeWidth = op.strokeWidth
+                }
+                if (op.highlighter) paint.alpha = 102
+                if (op.points.isNotEmpty()) {
+                    val path = Path()
+                    path.moveTo(op.points[0].x, op.points[0].y)
+                    for (i in 1 until op.points.size) {
+                        path.lineTo(op.points[i].x, op.points[i].y)
+                    }
+                    canvas.drawPath(path, paint)
+                }
+            }
+            is OverlayOp.StrokeRect -> canvas.drawRect(
+                op.left,
+                op.top,
+                op.right,
+                op.bottom,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = op.colorArgb.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = op.strokeWidth
+                }
+            )
+            is OverlayOp.FillRect -> canvas.drawRect(
+                op.left,
+                op.top,
+                op.right,
+                op.bottom,
+                Paint().apply { color = op.colorArgb.toInt() }
+            )
+            is OverlayOp.Text -> drawTextBlock(
+                canvas,
+                op.content,
+                op.x,
+                op.top,
+                op.size,
+                op.colorArgb.toInt(),
+                op.bold
+            )
+            is OverlayOp.Image -> {
+                val bitmap = op.bitmap
+                if (bitmap != null) {
+                    canvas.drawBitmap(
+                        bitmap,
+                        null,
+                        RectF(op.left, op.top, op.right, op.bottom),
+                        Paint(Paint.FILTER_BITMAP_FLAG)
+                    )
+                }
+            }
+        }
+    }
+
+    private fun drawTextBlock(
+        canvas: Canvas,
+        value: String,
+        x: Float,
+        top: Float,
+        size: Float,
+        color: Int,
+        bold: Boolean = false
+    ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = size
+            this.color = color
+            typeface = Typeface.create(
+                Typeface.SANS_SERIF,
+                if (bold) Typeface.BOLD else Typeface.NORMAL
+            )
+        }
+        var lineY = top + size
+        for (line in value.split('\n')) {
+            canvas.drawText(line, x, lineY, paint)
+            lineY += size * 1.25f
         }
     }
 

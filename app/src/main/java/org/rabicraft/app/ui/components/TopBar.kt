@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import org.rabicraft.app.R
 import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.ReadingTheme
+import org.rabicraft.app.ui.i18n.LocalStrings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,8 +52,10 @@ fun TopBar(
     onOpenSearch: () -> Unit,
     onOpenInspector: () -> Unit,
     onOpenDocument: () -> Unit,
+    onOpenLanguage: () -> Unit,
     onShare: () -> Unit
 ) {
+    val strings = LocalStrings.current
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -133,6 +137,13 @@ fun TopBar(
                 modifier = Modifier.testTag("inspector_button")
             ) {
                 Icon(Icons.Default.Info, contentDescription = "Document Info")
+            }
+
+            IconButton(
+                onClick = onOpenLanguage,
+                modifier = Modifier.testTag("language_button")
+            ) {
+                Icon(Icons.Default.Translate, contentDescription = strings.language)
             }
 
             IconButton(
