@@ -10,3 +10,21 @@ plan/
 # A craft-fonts checkout used as the optional CRAFT_FONTS_DIR build input (CI and releases put it here).
 /craft-fonts
 .claude/
+
+# Gradle and the Android build
+.gradle/
+build/
+.kotlin/
+local.properties
+*.hprof
+captures/
+
+# Signing material is never committed. Release builds read keystore.properties
+# (see app/build.gradle.kts); debug builds use AGP's own debug keystore.
+*.jks
+*.keystore
+keystore.properties
+
+# IDE files
+.idea/
+*.iml

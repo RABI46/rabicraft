@@ -1,93 +1,55 @@
-name: CI
+name: App CI
 
-# Quality gates for every push to main and every pull request (`cargo xtask ci`), through the
-# suite's shared gate workflow in craft-common-actions. Nightly fuzzing is in fuzz.yml.
+# The Android application in app/ is the product this repository ships; the Rust workspace it was
+# forked from no longer has a manifest. This gate builds and packages that app on every push to
+# main and every pull request.
+
 on:
   push:
     branches: [main]
   pull_request:
-    # `labeled` so that adding `full-ci` to an open PR starts a run with Windows in it.
-    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
-# The token is only used to check out the code: no job writes to the repository.
 permissions:
   contents: read
 
-# A newer push to a PR branch cancels its older run; every push to main runs to the end. Adding
-# any label but `full-ci` gets a group of its own, so it neither runs the gate nor cancels a run.
+# A newer push to a PR branch cancels its older run; every push to main runs to the end.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'full-ci') && github.ref || github.run_id }}
+  group: app-ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The shared gate doesn't check where git dependencies come from; release.yml runs the same job.
-  git-sources:
-    if: github.event.action != 'labeled' || github.event.label.name == 'full-ci'
-    name: Git dependencies come from storytold
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+  build:
+    name: Build app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      # The runner image ships the SDK; this is where it is.
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Windows font notice regressions
-        shell: pwsh
-        run: ./packaging/windows/test-font-notices.ps1
-      - name: Git dependencies come from storytold
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          # AGP 9 needs JDK 17+; the module targets Java 21.
+          java-version: "21"
+      - name: Install the Android SDK packages
         run: |
           set -euo pipefail
-          test -f Cargo.lock || { echo "Cargo.lock is missing"; exit 1; }
-          # Source replacement, patches and path overrides in cargo config never show up
-          # in Cargo.lock. Parsed rather than grepped: TOML has many spellings of one key.
-          # Cargo still reads the legacy .cargo/config.
-          python3 - <<'PY'
-          import os, sys, tomllib
-          for path in (".cargo/config", ".cargo/config.toml"):
-              if not os.path.exists(path):
-                  continue
-              config = tomllib.load(open(path, "rb"))
-              replaced = [name for name, source in config.get("source", {}).items()
-                          if isinstance(source, dict) and "replace-with" in source]
-              if replaced or "patch" in config or "paths" in config:
-                  print(f"{path} replaces, patches or overrides a source")
-                  sys.exit(1)
-          PY
-          # Fails when Cargo.lock is out of date with the manifests.
-          cargo metadata --locked --format-version 1 > /dev/null
-          python3 - <<'PY'
-          import sys, tomllib
-          lock = tomllib.load(open("Cargo.lock", "rb"))
-          bad = sorted({p["source"] for p in lock.get("package", [])
-                        if p.get("source", "").startswith("git+")
-                        and not p["source"].startswith("git+https://github.com/storytold/")})
-          if bad:
-              print("Git dependencies outside github.com/storytold:", *bad, sep="\n")
-              sys.exit(1)
-          PY
-
-  gate:
-    if: github.event.action != 'labeled' || github.event.label.name == 'full-ci'
-    # Pinned to the reviewed commit, as the fork's other workflows are: a suite-wide fix reaches
-    # this repository only through a reviewed bump of this line.
-    uses: storytold/craft-common-actions/.github/workflows/gate.yml@eddaf203b2d4873525a69842240214b23bac65ba
-    with:
-      # Windows on main, manual runs and pull requests labelled `full-ci`. No macOS on PRs or main:
-      # the org's 5 macOS slots are kept for release builds, and release.yml builds macOS.
-      os: ${{ (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '["ubuntu-24.04","windows-latest"]' || '["ubuntu-24.04"]' }}
-      # Same craft-fonts commit as release.yml and freebsd.yml.
-      craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
-      # egui/winit/rfd, and the independent oracles (crates/oracle).
-      packages: >-
-        libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-        libgtk-3-dev qpdf poppler-utils
-      # cargo-deny for the deny step of `cargo xtask ci`, which requires it under CI.
-      tools: cargo-nextest@0.9.150,cargo-deny@0.20.2
-      # A missing oracle fails the job instead of printing a skip notice that reads as a pass.
-      linux-env: RABICRAFT_ORACLES_REQUIRED=1
-      windows-env: RABICRAFT_REQUIRE_WINRES=1
-      # Windows checks what differs by platform: the build (with resources) and the tests.
-      windows-command: |
-        cargo clippy --workspace --all-targets --locked -- -D warnings
-        cargo test --workspace --locked
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Build the debug APK
+        run: ./gradlew --no-daemon :app:assembleDebug --stacktrace
+      - name: Run the unit tests
+        run: ./gradlew --no-daemon :app:testDebugUnitTest --stacktrace
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rabicraft-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30

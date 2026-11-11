@@ -1,17 +1,15 @@
 version: 2
 updates:
-  # Maintain Rust / Cargo dependencies
-  - package-ecosystem: "cargo"
+  # Maintain the Android build's Gradle dependencies
+  - package-ecosystem: "gradle"
     directories:
       - "/"
-      - "/crates/filters/fuzz"
     schedule:
       interval: "daily"
       time: "06:00"
       timezone: "America/New_York"
-    # Consolidate updates into a single PR rather than one PR per crate
     groups:
-      cargo-dependencies:
+      gradle-dependencies:
         patterns:
           - "*"
     commit-message:
