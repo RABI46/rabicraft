@@ -1,0 +1,6 @@
+{
+  "name": "RabiCraft",
+  "description": "The open-source PDF workbench to view, organize, annotate, and protect documents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
