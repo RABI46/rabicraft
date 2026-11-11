@@ -72,6 +72,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -91,6 +92,8 @@ import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.ReadingTheme
 import org.rabicraft.app.model.WorkbenchMode
+import org.rabicraft.app.model.EditKind
+import org.rabicraft.app.ui.edit.LocalEditLayer
 import org.rabicraft.app.ui.theme.SepiaPage
 import java.io.File
 import kotlin.math.roundToInt
@@ -809,6 +812,83 @@ private fun PdfPageRendererCanvas(
                         join = StrokeJoin.Round
                     )
                 )
+            }
+        }
+
+        // 2b. Objects placed in Edit PDF mode (text, images, shapes, whiteout)
+        val editLayer = LocalEditLayer.current
+        val pageEdits = editLayer?.edits?.get(page.pageIndex).orEmpty()
+        if (editLayer != null && pageEdits.isNotEmpty()) {
+            val density = LocalDensity.current
+            for (edit in pageEdits) {
+                val editWidth = (edit.widthRatio * widthPx).coerceAtLeast(24f)
+                val editHeight = (edit.heightRatio * heightPx).coerceAtLeast(18f)
+                val isSelected = edit.id == editLayer.selectedEditId
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                (edit.xRatio * widthPx).roundToInt(),
+                                (edit.yRatio * heightPx).roundToInt()
+                            )
+                        }
+                        .size(
+                            with(density) { editWidth.toDp() },
+                            with(density) { editHeight.toDp() }
+                        )
+                        .then(
+                            if (isSelected) {
+                                Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary)
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .pointerInput(edit.id) {
+                            detectDragGestures(
+                                onDragStart = { editLayer.onSelect(edit.id) },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    editLayer.onMove(
+                                        edit.id,
+                                        dragAmount.x / widthPx,
+                                        dragAmount.y / heightPx
+                                    )
+                                }
+                            )
+                        }
+                        .clickable { editLayer.onSelect(edit.id) }
+                        .testTag("page_edit_${edit.id}")
+                ) {
+                    when (edit.kind) {
+                        EditKind.TEXT -> Text(
+                            text = edit.text,
+                            color = Color(edit.colorArgb),
+                            fontSize = with(density) { (edit.fontSizeRatio * heightPx).toSp() },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        EditKind.IMAGE -> {
+                            val bitmap = edit.image
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                        EditKind.RECTANGLE -> Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .border(2.dp, Color(edit.colorArgb))
+                        )
+                        EditKind.WHITEOUT -> Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.White)
+                        )
+                    }
+                }
             }
         }
 

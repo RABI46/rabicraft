@@ -1,9 +1,11 @@
 package org.rabicraft.app.ui.components
 
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesomeMotion
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Security
@@ -17,81 +19,96 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import org.rabicraft.app.model.WorkbenchMode
+import org.rabicraft.app.ui.i18n.LocalStrings
 
 @Composable
 fun ToolRail(
     activeMode: WorkbenchMode,
     onSelectMode: (WorkbenchMode) -> Unit
 ) {
+    val strings = LocalStrings.current
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        NavigationBarItem(
-            selected = activeMode == WorkbenchMode.LIBRARY,
-            onClick = { onSelectMode(WorkbenchMode.LIBRARY) },
-            icon = { Icon(Icons.Default.FolderOpen, contentDescription = "Files") },
-            label = { Text("Files", fontWeight = FontWeight.Medium) },
-            modifier = Modifier.testTag("mode_library"),
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        RailItem(
+            mode = WorkbenchMode.LIBRARY,
+            activeMode = activeMode,
+            icon = { Icon(Icons.Default.FolderOpen, contentDescription = strings.files) },
+            label = strings.files,
+            tag = "mode_library",
+            onSelectMode = onSelectMode
         )
-
-        NavigationBarItem(
-            selected = activeMode == WorkbenchMode.READ,
-            onClick = { onSelectMode(WorkbenchMode.READ) },
-            icon = { Icon(Icons.Default.MenuBook, contentDescription = "Read") },
-            label = { Text("Read", fontWeight = FontWeight.Medium) },
-            modifier = Modifier.testTag("mode_read"),
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        RailItem(
+            mode = WorkbenchMode.READ,
+            activeMode = activeMode,
+            icon = { Icon(Icons.Default.MenuBook, contentDescription = strings.read) },
+            label = strings.read,
+            tag = "mode_read",
+            onSelectMode = onSelectMode
         )
-
-        NavigationBarItem(
-            selected = activeMode == WorkbenchMode.ORGANIZE,
-            onClick = { onSelectMode(WorkbenchMode.ORGANIZE) },
-            icon = { Icon(Icons.Default.AutoAwesomeMotion, contentDescription = "Organize") },
-            label = { Text("Organize", fontWeight = FontWeight.Medium) },
-            modifier = Modifier.testTag("mode_organize"),
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        RailItem(
+            mode = WorkbenchMode.ORGANIZE,
+            activeMode = activeMode,
+            icon = { Icon(Icons.Default.AutoAwesomeMotion, contentDescription = strings.organize) },
+            label = strings.organize,
+            tag = "mode_organize",
+            onSelectMode = onSelectMode
         )
-
-        NavigationBarItem(
-            selected = activeMode == WorkbenchMode.ANNOTATE,
-            onClick = { onSelectMode(WorkbenchMode.ANNOTATE) },
-            icon = { Icon(Icons.Default.Draw, contentDescription = "Annotate") },
-            label = { Text("Annotate", fontWeight = FontWeight.Medium) },
-            modifier = Modifier.testTag("mode_annotate"),
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        RailItem(
+            mode = WorkbenchMode.ANNOTATE,
+            activeMode = activeMode,
+            icon = { Icon(Icons.Default.Draw, contentDescription = strings.annotate) },
+            label = strings.annotate,
+            tag = "mode_annotate",
+            onSelectMode = onSelectMode
         )
-
-        NavigationBarItem(
-            selected = activeMode == WorkbenchMode.FILL_SIGN,
-            onClick = { onSelectMode(WorkbenchMode.FILL_SIGN) },
-            icon = { Icon(Icons.Default.BorderColor, contentDescription = "Fill & Sign") },
-            label = { Text("Fill & Sign", fontWeight = FontWeight.Medium) },
-            modifier = Modifier.testTag("mode_fill_sign"),
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        RailItem(
+            mode = WorkbenchMode.EDIT,
+            activeMode = activeMode,
+            icon = { Icon(Icons.Default.Edit, contentDescription = strings.edit) },
+            label = strings.edit,
+            tag = "mode_edit",
+            onSelectMode = onSelectMode
         )
-
-        NavigationBarItem(
-            selected = activeMode == WorkbenchMode.PROTECT,
-            onClick = { onSelectMode(WorkbenchMode.PROTECT) },
-            icon = { Icon(Icons.Default.Security, contentDescription = "Protect") },
-            label = { Text("Protect", fontWeight = FontWeight.Medium) },
-            modifier = Modifier.testTag("mode_protect"),
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        RailItem(
+            mode = WorkbenchMode.FILL_SIGN,
+            activeMode = activeMode,
+            icon = { Icon(Icons.Default.BorderColor, contentDescription = strings.fillSign) },
+            label = strings.fillSign,
+            tag = "mode_fill_sign",
+            onSelectMode = onSelectMode
+        )
+        RailItem(
+            mode = WorkbenchMode.PROTECT,
+            activeMode = activeMode,
+            icon = { Icon(Icons.Default.Security, contentDescription = strings.protect) },
+            label = strings.protect,
+            tag = "mode_protect",
+            onSelectMode = onSelectMode
         )
     }
+}
+
+@Composable
+private fun RowScope.RailItem(
+    mode: WorkbenchMode,
+    activeMode: WorkbenchMode,
+    icon: @Composable () -> Unit,
+    label: String,
+    tag: String,
+    onSelectMode: (WorkbenchMode) -> Unit
+) {
+    NavigationBarItem(
+        selected = activeMode == mode,
+        onClick = { onSelectMode(mode) },
+        icon = icon,
+        label = { Text(label, fontWeight = FontWeight.Medium, fontSize = 10.sp) },
+        modifier = Modifier.testTag(tag),
+        colors = NavigationBarItemDefaults.colors(
+            indicatorColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    )
 }

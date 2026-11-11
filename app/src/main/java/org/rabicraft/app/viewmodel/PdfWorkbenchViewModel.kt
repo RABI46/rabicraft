@@ -2,6 +2,7 @@ package org.rabicraft.app.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,7 +10,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.rabicraft.app.data.AppLanguage
 import org.rabicraft.app.data.DocumentRepository
+import org.rabicraft.app.data.LanguageStore
 import org.rabicraft.app.data.local.DocumentEntity
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -19,8 +23,10 @@ import org.rabicraft.app.model.AnnotationType
 import org.rabicraft.app.model.BookmarkItem
 import org.rabicraft.app.model.CommentItem
 import org.rabicraft.app.model.CommentReply
+import org.rabicraft.app.model.EditKind
 import org.rabicraft.app.model.FieldType
 import org.rabicraft.app.model.FormFieldItem
+import org.rabicraft.app.model.PageEdit
 import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.PdfDocumentInfo
@@ -34,6 +40,17 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
 
     private val repository = PdfRepository(application.applicationContext)
     private val documentRepository = DocumentRepository(application.applicationContext)
+    private val languageStore = LanguageStore(application.applicationContext)
+
+    private val _language = MutableStateFlow(languageStore.current())
+    val language: StateFlow<AppLanguage> = _language.asStateFlow()
+
+    // Objects placed in "Edit PDF" mode, keyed by page index. Flattened into the export.
+    private val _edits = MutableStateFlow<Map<Int, List<PageEdit>>>(emptyMap())
+    val edits: StateFlow<Map<Int, List<PageEdit>>> = _edits.asStateFlow()
+
+    private val _selectedEditId = MutableStateFlow<String?>(null)
+    val selectedEditId: StateFlow<String?> = _selectedEditId.asStateFlow()
 
     val documents: StateFlow<List<DocumentEntity>> = documentRepository.allDocuments
     val groups: StateFlow<List<String>> = documentRepository.distinctGroups
@@ -133,6 +150,8 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
                 _bookmarks.value = repository.sampleBookmarks
                 _currentPageIndex.value = 0
                 initializeSampleData()
+                _edits.value = emptyMap()
+                _selectedEditId.value = null
                 preloadBitmaps(pageList)
                 _statusMessage.value = "Loaded specimen: ${doc.name}"
             } catch (e: Throwable) {
@@ -157,6 +176,8 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
                 _annotations.value = emptyMap()
                 _comments.value = emptyList()
                 _formFields.value = emptyList()
+                _edits.value = emptyMap()
+                _selectedEditId.value = null
                 preloadBitmaps(pageList)
                 _statusMessage.value = "Opened ${doc.name}"
             } catch (e: Throwable) {
@@ -341,6 +362,141 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
         _annotations.value = currentMap
     }
 
+    fun setLanguage(language: AppLanguage) {
+        _language.value = language
+        languageStore.set(language)
+    }
+
+    fun selectEdit(editId: String?) {
+        _selectedEditId.value = editId
+    }
+
+    fun addTextEdit(pageIndex: Int, text: String, colorArgb: Long) {
+        if (text.isBlank()) return
+        val lines = text.trim().lines().size.coerceAtLeast(1)
+        val edit = PageEdit(
+            id = UUID.randomUUID().toString(),
+            pageIndex = pageIndex,
+            kind = EditKind.TEXT,
+            xRatio = 0.12f,
+            yRatio = 0.18f,
+            widthRatio = 0.62f,
+            heightRatio = (0.024f * 1.45f * lines).coerceAtLeast(0.035f),
+            text = text.trim(),
+            colorArgb = colorArgb
+        )
+        appendEdit(edit)
+        _selectedEditId.value = edit.id
+    }
+
+    fun addShapeEdit(pageIndex: Int) {
+        val edit = PageEdit(
+            id = UUID.randomUUID().toString(),
+            pageIndex = pageIndex,
+            kind = EditKind.RECTANGLE,
+            xRatio = 0.2f,
+            yRatio = 0.3f,
+            widthRatio = 0.4f,
+            heightRatio = 0.18f,
+            colorArgb = _penColor.value
+        )
+        appendEdit(edit)
+        _selectedEditId.value = edit.id
+    }
+
+    fun addWhiteoutEdit(pageIndex: Int) {
+        val edit = PageEdit(
+            id = UUID.randomUUID().toString(),
+            pageIndex = pageIndex,
+            kind = EditKind.WHITEOUT,
+            xRatio = 0.15f,
+            yRatio = 0.22f,
+            widthRatio = 0.5f,
+            heightRatio = 0.045f
+        )
+        appendEdit(edit)
+        _selectedEditId.value = edit.id
+    }
+
+    fun addImageEdit(uri: Uri) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val bitmap = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openInputStream(uri)?.use {
+                        BitmapFactory.decodeStream(it)
+                    }
+                }
+                if (bitmap == null) {
+                    _statusMessage.value = "Unsupported image"
+                    return@launch
+                }
+                val pageIndex = _currentPageIndex.value
+                val page = _pages.value.getOrNull(pageIndex)
+                val pageAspect = if (page != null && page.height > 0) {
+                    page.width.toFloat() / page.height.toFloat()
+                } else {
+                    595f / 842f
+                }
+                val widthRatio = 0.55f
+                val heightRatio = (widthRatio * bitmap.height.toFloat() / bitmap.width.toFloat() * pageAspect)
+                    .coerceIn(0.05f, 0.75f)
+                val edit = PageEdit(
+                    id = UUID.randomUUID().toString(),
+                    pageIndex = pageIndex,
+                    kind = EditKind.IMAGE,
+                    xRatio = 0.2f,
+                    yRatio = 0.3f,
+                    widthRatio = widthRatio,
+                    heightRatio = heightRatio,
+                    image = bitmap
+                )
+                appendEdit(edit)
+                _selectedEditId.value = edit.id
+            } catch (e: Exception) {
+                _statusMessage.value = "Image import failed: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private fun appendEdit(edit: PageEdit) {
+        val currentMap = _edits.value
+        _edits.value = currentMap + (edit.pageIndex to (currentMap[edit.pageIndex].orEmpty() + edit))
+    }
+
+    fun moveEdit(editId: String, dx: Float, dy: Float) {
+        val currentMap = _edits.value
+        val pageIndex = currentMap.entries.firstOrNull { entry -> entry.value.any { it.id == editId } }?.key ?: return
+        val updated = currentMap[pageIndex].orEmpty().map { edit ->
+            if (edit.id != editId) {
+                edit
+            } else {
+                edit.copy(
+                    xRatio = (edit.xRatio + dx).coerceIn(0f, (1f - edit.widthRatio).coerceAtLeast(0f)),
+                    yRatio = (edit.yRatio + dy).coerceIn(0f, (1f - edit.heightRatio).coerceAtLeast(0f))
+                )
+            }
+        }
+        _edits.value = currentMap + (pageIndex to updated)
+    }
+
+    fun removeSelectedEdit() {
+        val editId = _selectedEditId.value ?: return
+        val currentMap = _edits.value
+        val pageIndex = currentMap.entries.firstOrNull { entry -> entry.value.any { it.id == editId } }?.key ?: return
+        _edits.value = currentMap + (pageIndex to currentMap[pageIndex].orEmpty().filterNot { it.id == editId })
+        _selectedEditId.value = null
+    }
+
+    fun clearPageEdits(pageIndex: Int) {
+        if (_edits.value.containsKey(pageIndex)) {
+            _edits.value = _edits.value - pageIndex
+        }
+        _selectedEditId.value = null
+    }
+
     fun clearAnnotations(pageIndex: Int) {
         val currentMap = _annotations.value.toMutableMap()
         currentMap.remove(pageIndex)
@@ -464,7 +620,13 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
             _isLoading.value = true
             try {
                 val exportFile = File(getApplication<Application>().cacheDir, "RabiCraft_Export_${System.currentTimeMillis()}.pdf")
-                val success = repository.exportCurrentDocument(_pages.value, exportFile)
+                val success = repository.exportCurrentDocument(
+                    pages = _pages.value,
+                    annotations = _annotations.value,
+                    edits = _edits.value,
+                    formFields = _formFields.value,
+                    targetFile = exportFile
+                )
                 if (success) {
                     _statusMessage.value = "Exported to ${exportFile.name}"
                     onComplete(exportFile)
@@ -522,6 +684,8 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
                 _bookmarks.value = listOf(BookmarkItem("bm-root", entity.name, 0))
                 _currentPageIndex.value = 0
                 _workbenchMode.value = WorkbenchMode.READ
+                _edits.value = emptyMap()
+                _selectedEditId.value = null
                 preloadBitmaps(pageList)
                 _statusMessage.value = "Imported '${entity.name}' to '${entity.groupName}'"
             } catch (e: Exception) {
@@ -546,7 +710,9 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
                     _bookmarks.value = if (entity.isSample) repository.sampleBookmarks else listOf(BookmarkItem("bm-root", entity.name, 0))
                     _currentPageIndex.value = 0
                     _workbenchMode.value = WorkbenchMode.READ
-                    preloadBitmaps(pageList)
+                    _edits.value = emptyMap()
+                _selectedEditId.value = null
+                preloadBitmaps(pageList)
                     _statusMessage.value = "Opened '${entity.name}'"
                 } else {
                     _statusMessage.value = "File not found: ${entity.name}"

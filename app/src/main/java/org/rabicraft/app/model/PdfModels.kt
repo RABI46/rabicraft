@@ -114,6 +114,7 @@ enum class WorkbenchMode {
     READ,
     ORGANIZE,
     ANNOTATE,
+    EDIT,
     FILL_SIGN,
     PROTECT
 }
@@ -143,4 +144,29 @@ data class BookmarkItem(
     val pageIndex: Int,
     val level: Int = 0,
     val children: List<BookmarkItem> = emptyList()
+)
+
+/**
+ * Objects placed on a page in "Edit PDF" mode. Positions and sizes are stored relative to the page
+ * so they survive preview scaling and are baked into the exported PDF.
+ */
+enum class EditKind {
+    TEXT,
+    IMAGE,
+    RECTANGLE,
+    WHITEOUT
+}
+
+data class PageEdit(
+    val id: String,
+    val pageIndex: Int,
+    val kind: EditKind,
+    val xRatio: Float,
+    val yRatio: Float,
+    val widthRatio: Float,
+    val heightRatio: Float,
+    val text: String = "",
+    val colorArgb: Long = 0xFF18181BL,
+    val fontSizeRatio: Float = 0.024f,
+    val image: Bitmap? = null
 )

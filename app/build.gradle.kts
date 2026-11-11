@@ -23,7 +23,8 @@ val hasReleaseKeystore = keystorePropertiesFile.isFile &&
 
 android {
     namespace = "org.rabicraft.app"
-    compileSdk = 36
+    // The dependency set bumped on main requires compiling against API 37.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "org.rabicraft.app"
@@ -88,4 +89,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     annotationProcessor(libs.androidx.room.compiler)
+
+    testImplementation(libs.junit)
 }

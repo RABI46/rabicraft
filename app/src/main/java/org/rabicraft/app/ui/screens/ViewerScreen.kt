@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,7 +53,12 @@ import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.ReadingTheme
 import org.rabicraft.app.model.WorkbenchMode
+import org.rabicraft.app.model.PageEdit
+import org.rabicraft.app.ui.components.EditAction
+import org.rabicraft.app.ui.components.EditToolbar
 import org.rabicraft.app.ui.components.PdfRendererComponent
+import org.rabicraft.app.ui.edit.EditLayer
+import org.rabicraft.app.ui.edit.LocalEditLayer
 import org.rabicraft.app.ui.theme.SepiaBackground
 import java.io.File
 
@@ -72,6 +78,11 @@ fun ViewerScreen(
     activeAnnotType: AnnotationType,
     penColor: Long,
     strokeWidth: Float,
+    edits: Map<Int, List<PageEdit>>,
+    selectedEditId: String?,
+    onSelectEdit: (String?) -> Unit,
+    onMoveEdit: (String, Float, Float) -> Unit,
+    onEditAction: (EditAction) -> Unit,
     onSelectPage: (Int) -> Unit,
     onAddAnnotation: (Int, AnnotationItem) -> Unit,
     onClearAnnotations: (Int) -> Unit,
@@ -151,34 +162,55 @@ fun ViewerScreen(
             )
         }
 
+        // Edit PDF Action Bar (Only visible when in EDIT mode)
+        if (workbenchMode == WorkbenchMode.EDIT) {
+            EditToolbar(
+                hasSelection = selectedEditId != null,
+                onAction = onEditAction
+            )
+        }
+
         // Main PDF Canvas using the dedicated PdfRendererComponent
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            PdfRendererComponent(
-                pdfFile = pdfFile,
-                pages = pages,
-                currentPageIndex = currentPageIndex,
-                layoutMode = layoutMode,
-                readingTheme = readingTheme,
-                workbenchMode = workbenchMode,
-                zoomLevel = zoomLevel,
-                annotations = annotations,
-                formFields = formFields,
-                comments = comments,
-                colorFilter = colorFilter,
-                activeAnnotType = activeAnnotType,
-                penColor = penColor,
-                strokeWidth = strokeWidth,
-                onPageChanged = onSelectPage,
-                onAddAnnotation = onAddAnnotation,
-                onUpdateFormField = onUpdateFormField,
-                onToggleFormFieldChecked = onToggleFormFieldChecked,
-                onCommentClick = { onOpenComments() },
-                modifier = Modifier.fillMaxSize()
-            )
+            val editLayer = if (workbenchMode == WorkbenchMode.EDIT) {
+                EditLayer(
+                    edits = edits,
+                    selectedEditId = selectedEditId,
+                    onSelect = onSelectEdit,
+                    onMove = onMoveEdit
+                )
+            } else {
+                null
+            }
+
+            CompositionLocalProvider(LocalEditLayer provides editLayer) {
+                PdfRendererComponent(
+                    pdfFile = pdfFile,
+                    pages = pages,
+                    currentPageIndex = currentPageIndex,
+                    layoutMode = layoutMode,
+                    readingTheme = readingTheme,
+                    workbenchMode = workbenchMode,
+                    zoomLevel = zoomLevel,
+                    annotations = annotations,
+                    formFields = formFields,
+                    comments = comments,
+                    colorFilter = colorFilter,
+                    activeAnnotType = activeAnnotType,
+                    penColor = penColor,
+                    strokeWidth = strokeWidth,
+                    onPageChanged = onSelectPage,
+                    onAddAnnotation = onAddAnnotation,
+                    onUpdateFormField = onUpdateFormField,
+                    onToggleFormFieldChecked = onToggleFormFieldChecked,
+                    onCommentClick = { onOpenComments() },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             // Floating Comments Button
             Surface(
