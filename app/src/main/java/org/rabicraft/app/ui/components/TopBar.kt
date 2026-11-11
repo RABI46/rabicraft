@@ -1,6 +1,7 @@
 package org.rabicraft.app.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -10,12 +11,15 @@ import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,6 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -37,6 +45,14 @@ import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.ReadingTheme
 import org.rabicraft.app.ui.i18n.LocalStrings
 
+/**
+ * Top bar of the workbench.
+ *
+ * Only the actions people reach for constantly stay on the bar (open, search, tools, share); zoom,
+ * layout, theme, document info and language live in the overflow menu. Earlier every action had its
+ * own icon, and on a phone-width screen the last ones — tools and share — were pushed off the bar
+ * and became unreachable.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(
@@ -58,6 +74,8 @@ fun TopBar(
     onShare: () -> Unit
 ) {
     val strings = LocalStrings.current
+    var menuOpen by remember { mutableStateOf(false) }
+
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -100,52 +118,10 @@ fun TopBar(
             }
 
             IconButton(
-                onClick = onZoomOut,
-                modifier = Modifier.testTag("zoom_out_button")
-            ) {
-                Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out")
-            }
-
-            IconButton(
-                onClick = onZoomIn,
-                modifier = Modifier.testTag("zoom_in_button")
-            ) {
-                Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In")
-            }
-
-            IconButton(
-                onClick = onToggleLayoutMode,
-                modifier = Modifier.testTag("layout_mode_button")
-            ) {
-                Icon(Icons.Default.ViewCarousel, contentDescription = "Layout: $layoutMode")
-            }
-
-            IconButton(
-                onClick = onCycleReadingTheme,
-                modifier = Modifier.testTag("reading_theme_button")
-            ) {
-                Icon(Icons.Default.Brightness4, contentDescription = "Theme: $readingTheme")
-            }
-
-            IconButton(
                 onClick = onOpenSearch,
                 modifier = Modifier.testTag("search_button")
             ) {
                 Icon(Icons.Default.Search, contentDescription = "Search text")
-            }
-
-            IconButton(
-                onClick = onOpenInspector,
-                modifier = Modifier.testTag("inspector_button")
-            ) {
-                Icon(Icons.Default.Info, contentDescription = "Document Info")
-            }
-
-            IconButton(
-                onClick = onOpenLanguage,
-                modifier = Modifier.testTag("language_button")
-            ) {
-                Icon(Icons.Default.Translate, contentDescription = strings.language)
             }
 
             IconButton(
@@ -160,6 +136,57 @@ fun TopBar(
                 modifier = Modifier.testTag("share_button")
             ) {
                 Icon(Icons.Default.Share, contentDescription = "Export & Share")
+            }
+
+            Box {
+                IconButton(
+                    onClick = { menuOpen = true },
+                    modifier = Modifier.testTag("more_button")
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                }
+
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Zoom in") },
+                        onClick = { menuOpen = false; onZoomIn() },
+                        leadingIcon = { Icon(Icons.Default.ZoomIn, contentDescription = null) },
+                        modifier = Modifier.testTag("zoom_in_button")
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Zoom out") },
+                        onClick = { menuOpen = false; onZoomOut() },
+                        leadingIcon = { Icon(Icons.Default.ZoomOut, contentDescription = null) },
+                        modifier = Modifier.testTag("zoom_out_button")
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Layout: ${layoutMode.name.lowercase()}") },
+                        onClick = { menuOpen = false; onToggleLayoutMode() },
+                        leadingIcon = { Icon(Icons.Default.ViewCarousel, contentDescription = null) },
+                        modifier = Modifier.testTag("layout_mode_button")
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Theme: ${readingTheme.name.lowercase()}") },
+                        onClick = { menuOpen = false; onCycleReadingTheme() },
+                        leadingIcon = { Icon(Icons.Default.Brightness4, contentDescription = null) },
+                        modifier = Modifier.testTag("reading_theme_button")
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Document info") },
+                        onClick = { menuOpen = false; onOpenInspector() },
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                        modifier = Modifier.testTag("inspector_button")
+                    )
+                    DropdownMenuItem(
+                        text = { Text(strings.language) },
+                        onClick = { menuOpen = false; onOpenLanguage() },
+                        leadingIcon = { Icon(Icons.Default.Translate, contentDescription = null) },
+                        modifier = Modifier.testTag("language_button")
+                    )
+                }
             }
         }
     )
