@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- No action bar: the app draws its own chrome on the canvas. -->
-    <style name="Theme.RabiCraft" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#F1F1F3</item>
-    </style>
-</resources>
