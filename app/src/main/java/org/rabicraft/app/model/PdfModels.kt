@@ -12,9 +12,9 @@ data class PdfDocumentInfo(
     val isSample: Boolean = false,
     val pdfVersion: String = "PDF 1.7",
     val title: String = name,
-    val author: String = "RabiCraft User",
-    val creator: String = "RabiCraft Engine 1.0",
-    val producer: String = "RabiCraft Rust & Android Core",
+    val author: String = "FranPdf User",
+    val creator: String = "FranPdf Engine 1.0",
+    val producer: String = "FranPdf Android Core",
     val isEncrypted: Boolean = false,
     val permissions: DocumentPermissions = DocumentPermissions()
 )

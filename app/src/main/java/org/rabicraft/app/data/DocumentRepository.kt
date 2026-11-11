@@ -140,8 +140,8 @@ class DocumentRepository(
 
         val showcaseEntity = DocumentEntity(
             "showcase-doc-id",
-            "RabiCraft Showcase",
-            "RabiCraft_Showcase.pdf",
+            "FranPdf Showcase",
+            "FranPdf_Showcase.pdf",
             showcaseFile.absolutePath,
             showcaseFile.length(),
             pageCount,

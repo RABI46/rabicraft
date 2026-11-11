@@ -13,7 +13,7 @@ import java.io.FileOutputStream
 object ShowcaseGenerator {
 
     fun generateShowcasePdf(context: Context): File {
-        val targetFile = File(context.cacheDir, "RabiCraft_Showcase.pdf")
+        val targetFile = File(context.cacheDir, "FranPdf_Showcase.pdf")
         if (targetFile.exists() && targetFile.length() > 500) {
             var isValid = false
             try {
@@ -32,7 +32,7 @@ object ShowcaseGenerator {
             }
         }
 
-        val tempFile = File(context.cacheDir, "RabiCraft_Showcase.pdf.tmp")
+        val tempFile = File(context.cacheDir, "FranPdf_Showcase.pdf.tmp")
         if (tempFile.exists()) {
             tempFile.delete()
         }
@@ -115,7 +115,7 @@ object ShowcaseGenerator {
         paint.color = Color.parseColor("#18181B")
         paint.textSize = 34f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("RabiCraft", 170f, 140f, paint)
+        canvas.drawText("FranPdf", 170f, 140f, paint)
 
         paint.textSize = 14f
         paint.typeface = Typeface.DEFAULT
@@ -194,7 +194,7 @@ object ShowcaseGenerator {
         // Footer
         paint.color = Color.parseColor("#A1A1AA")
         paint.textSize = 10f
-        canvas.drawText("RabiCraft Specimen v1.0 • Cover Page (i)", 60f, height - 40f, paint)
+        canvas.drawText("FranPdf Specimen v1.0 • Cover Page (i)", 60f, height - 40f, paint)
     }
 
     private fun drawScriptsPage(canvas: Canvas, width: Int, height: Int) {
@@ -250,7 +250,7 @@ object ShowcaseGenerator {
         // Footer
         paint.color = Color.parseColor("#A1A1AA")
         paint.textSize = 10f
-        canvas.drawText("RabiCraft Specimen v1.0 • Page 2 of 5", 60f, height - 40f, paint)
+        canvas.drawText("FranPdf Specimen v1.0 • Page 2 of 5", 60f, height - 40f, paint)
     }
 
     private fun drawArchitecturePage(canvas: Canvas, width: Int, height: Int) {
@@ -335,7 +335,7 @@ object ShowcaseGenerator {
         // Footer
         paint.color = Color.parseColor("#A1A1AA")
         paint.textSize = 10f
-        canvas.drawText("RabiCraft Specimen v1.0 • Page 3 of 5", 60f, height - 40f, paint)
+        canvas.drawText("FranPdf Specimen v1.0 • Page 3 of 5", 60f, height - 40f, paint)
     }
 
     private fun drawFormsPage(canvas: Canvas, width: Int, height: Int) {
@@ -443,7 +443,7 @@ object ShowcaseGenerator {
         // Footer
         paint.color = Color.parseColor("#A1A1AA")
         paint.textSize = 10f
-        canvas.drawText("RabiCraft Specimen v1.0 • Page 4 of 5", 60f, height - 40f, paint)
+        canvas.drawText("FranPdf Specimen v1.0 • Page 4 of 5", 60f, height - 40f, paint)
     }
 
     private fun drawVectorStandardsPage(canvas: Canvas, width: Int, height: Int) {
@@ -511,6 +511,6 @@ object ShowcaseGenerator {
         // Footer
         paint.color = Color.parseColor("#A1A1AA")
         paint.textSize = 10f
-        canvas.drawText("RabiCraft Specimen v1.0 • Page 5 of 5", 60f, height - 40f, paint)
+        canvas.drawText("FranPdf Specimen v1.0 • Page 5 of 5", 60f, height - 40f, paint)
     }
 }

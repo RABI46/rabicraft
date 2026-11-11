@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(Intent.createChooser(shareIntent, "Share PDF with RabiCraft"))
+            startActivity(Intent.createChooser(shareIntent, "Share PDF with FranPdf"))
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -171,7 +171,7 @@ fun MainAppScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopBar(
-                documentName = documentInfo?.name ?: "RabiCraft",
+                documentName = documentInfo?.name ?: "FranPdf",
                 currentPage = currentPageIndex,
                 totalPages = pages.size,
                 zoomLevel = zoomLevel,
