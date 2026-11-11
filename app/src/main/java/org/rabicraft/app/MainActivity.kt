@@ -47,6 +47,7 @@ import org.rabicraft.app.ui.components.TopBar
 import org.rabicraft.app.ui.screens.DocumentLibraryScreen
 import org.rabicraft.app.ui.screens.OrganizeScreen
 import org.rabicraft.app.ui.screens.ProtectScreen
+import org.rabicraft.app.ui.screens.ToolsScreen
 import org.rabicraft.app.ui.i18n.LocalStrings
 import org.rabicraft.app.ui.i18n.stringsFor
 import org.rabicraft.app.ui.screens.ViewerScreen
@@ -78,6 +79,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onShareFile = { file ->
                             sharePdfFile(file)
+                        },
+                        onShareFiles = { files ->
+                            sharePdfFiles(files)
                         }
                     )
                 }
@@ -86,21 +90,46 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sharePdfFile(file: File) {
+        sharePdfFiles(listOf(file))
+    }
+
+    /** Shares one file, or every produced file when a tool writes several (split, page images). */
+    private fun sharePdfFiles(files: List<File>) {
+        if (files.isEmpty()) return
         try {
-            val contentUri: Uri = FileProvider.getUriForFile(
-                this,
-                "${applicationContext.packageName}.fileprovider",
-                file
-            )
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val uris = ArrayList<Uri>()
+            for (file in files) {
+                uris.add(
+                    FileProvider.getUriForFile(
+                        this,
+                        "${applicationContext.packageName}.fileprovider",
+                        file
+                    )
+                )
             }
-            startActivity(Intent.createChooser(shareIntent, "Share PDF with FranPdf"))
+            val shareIntent = if (uris.size == 1) {
+                Intent(Intent.ACTION_SEND).apply {
+                    type = mimeTypeFor(files.first())
+                    putExtra(Intent.EXTRA_STREAM, uris.first())
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            } else {
+                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                    type = mimeTypeFor(files.first())
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share with FranPdf"))
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun mimeTypeFor(file: File): String = when (file.extension.lowercase()) {
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        else -> "application/pdf"
     }
 }
 
@@ -108,7 +137,8 @@ class MainActivity : ComponentActivity() {
 fun MainAppScreen(
     viewModel: PdfWorkbenchViewModel,
     onOpenDocumentPicker: (androidx.activity.result.ActivityResultLauncher<Array<String>>) -> Unit,
-    onShareFile: (File) -> Unit
+    onShareFile: (File) -> Unit,
+    onShareFiles: (List<File>) -> Unit
 ) {
     val documentInfo by viewModel.documentInfo.collectAsStateWithLifecycle()
     val activePdfFile by viewModel.activePdfFile.collectAsStateWithLifecycle()
@@ -147,6 +177,7 @@ fun MainAppScreen(
     var showSearchOverlay by remember { mutableStateOf(false) }
     var showTextDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showTools by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -158,6 +189,16 @@ fun MainAppScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let { viewModel.importDocument(it) }
+    }
+
+    val mergePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            viewModel.mergeDocuments(uris) { file ->
+                if (file != null) onShareFile(file)
+            }
+        }
     }
 
     LaunchedEffect(statusMessage) {
@@ -200,6 +241,7 @@ fun MainAppScreen(
                 onOpenInspector = { showInspector = true },
                 onOpenDocument = { onOpenDocumentPicker(filePickerLauncher) },
                 onOpenLanguage = { showLanguageDialog = true },
+                onOpenTools = { showTools = true },
                 onShare = {
                     viewModel.exportDocument { file ->
                         if (file != null) onShareFile(file)
@@ -301,6 +343,20 @@ fun MainAppScreen(
                         }
                     )
                 }
+            }
+
+            if (showTools) {
+                ToolsScreen(
+                    totalPages = pages.size,
+                    isBusy = isLoading,
+                    onClose = { showTools = false },
+                    onApply = { config ->
+                        viewModel.applyTool(config) { files ->
+                            if (files.isNotEmpty()) onShareFiles(files)
+                        }
+                    },
+                    onPickMergeFiles = { mergePickerLauncher.launch(arrayOf("application/pdf")) }
+                )
             }
 
             // Search Overlay Bar

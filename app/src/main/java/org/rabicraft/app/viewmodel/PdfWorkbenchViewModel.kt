@@ -17,7 +17,11 @@ import org.rabicraft.app.data.LanguageStore
 import org.rabicraft.app.data.local.DocumentEntity
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import org.rabicraft.app.data.PdfRepository
+import org.rabicraft.app.data.ocr.OcrEngine
+import org.rabicraft.app.data.ocr.OcrPageResult
+import org.rabicraft.app.data.tools.ToolPlanner
 import org.rabicraft.app.model.AnnotationItem
 import org.rabicraft.app.model.AnnotationType
 import org.rabicraft.app.model.BookmarkItem
@@ -32,6 +36,7 @@ import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.PdfDocumentInfo
 import org.rabicraft.app.model.ReadingTheme
 import org.rabicraft.app.model.SearchMatch
+import org.rabicraft.app.model.ToolConfig
 import org.rabicraft.app.model.WorkbenchMode
 import java.io.File
 import java.util.UUID
@@ -41,6 +46,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
     private val repository = PdfRepository(application.applicationContext)
     private val documentRepository = DocumentRepository(application.applicationContext)
     private val languageStore = LanguageStore(application.applicationContext)
+    private val ocrEngine = OcrEngine()
 
     private val _language = MutableStateFlow(languageStore.current())
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
@@ -667,6 +673,278 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    /**
+     * Runs a document tool on the open document and hands the produced files back to the caller.
+     * Tools that edit the document write one PDF; split and image export write several files.
+     */
+    fun applyTool(config: ToolConfig, onComplete: (List<File>) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val pages = _pages.value
+            val title = _documentInfo.value?.name?.removeSuffix(".pdf") ?: "Document"
+            val stamp = System.currentTimeMillis()
+            val cacheDir = getApplication<Application>().cacheDir
+            val selectionSpec = when (config) {
+                is ToolConfig.PageNumbers -> config.settings.selection
+                is ToolConfig.Watermark -> config.settings.selection
+                is ToolConfig.HeaderFooter -> config.settings.selection
+                is ToolConfig.Compress -> config.settings.selection
+                is ToolConfig.Colour -> config.selection
+                is ToolConfig.Crop -> config.selection
+                is ToolConfig.Ocr -> config.selection
+                else -> ""
+            }
+            val selection = ToolPlanner.parsePageSelection(selectionSpec, pages.size)
+            if (selection != null && selection.isEmpty()) {
+                _statusMessage.value = "No page matches \"$selectionSpec\"."
+                onComplete(emptyList())
+                return@launch
+            }
+            try {
+                when (config) {
+                    is ToolConfig.PageNumbers -> exportPlan(
+                        ToolPlanner.pageNumberPlan(pages, config.settings, title),
+                        File(cacheDir, "FranPdf_Numbers_$stamp.pdf"),
+                        onComplete
+                    )
+                    is ToolConfig.Watermark -> exportPlan(
+                        ToolPlanner.watermarkPlan(pages, config.settings),
+                        File(cacheDir, "FranPdf_Watermark_$stamp.pdf"),
+                        onComplete
+                    )
+                    is ToolConfig.HeaderFooter -> exportPlan(
+                        ToolPlanner.headerFooterPlan(pages, config.settings, title),
+                        File(cacheDir, "FranPdf_Header_$stamp.pdf"),
+                        onComplete
+                    )
+                    is ToolConfig.NUp -> exportPlan(
+                        ToolPlanner.nUpPlan(pages, config.settings),
+                        File(cacheDir, "FranPdf_NUp_$stamp.pdf"),
+                        onComplete
+                    )
+                    ToolConfig.Booklet -> exportPlan(
+                        ToolPlanner.bookletPlan(pages),
+                        File(cacheDir, "FranPdf_Booklet_$stamp.pdf"),
+                        onComplete
+                    )
+                    is ToolConfig.Crop -> exportPlan(
+                        ToolPlanner.cropPlan(pages, config.settings, config.selection),
+                        File(cacheDir, "FranPdf_Cropped_$stamp.pdf"),
+                        onComplete
+                    )
+                    is ToolConfig.Colour -> exportPlan(
+                        ToolPlanner.colourPlan(pages, config.effect, config.selection),
+                        File(cacheDir, "FranPdf_Colour_$stamp.pdf"),
+                        onComplete
+                    )
+                    is ToolConfig.Compress -> exportPlan(
+                        ToolPlanner.sequentialPlan(
+                            pages = pages,
+                            renderDpi = config.settings.maxDpi,
+                            jpegQuality = config.settings.jpegQuality,
+                            selection = selection
+                        ),
+                        File(cacheDir, "FranPdf_Compressed_$stamp.pdf"),
+                        onComplete
+                    )
+                    is ToolConfig.BlankPages -> {
+                        val ratios = repository.measureInkRatios(pages)
+                        val kept = pages.filterIndexed { index, _ ->
+                            !ToolPlanner.isBlank(ratios.getOrElse(index) { 1f }, config.settings)
+                        }
+                        val removed = pages.size - kept.size
+                        if (kept.isEmpty()) {
+                            _statusMessage.value = "Every page is blank; nothing was written."
+                            onComplete(emptyList())
+                        } else {
+                            val ok = repository.exportWithPlan(
+                                pages = pages,
+                                plan = ToolPlanner.sequentialPlan(kept),
+                                targetFile = File(cacheDir, "FranPdf_NoBlanks_$stamp.pdf")
+                            )
+                            _statusMessage.value = if (ok) {
+                                "Removed $removed blank page(s)."
+                            } else {
+                                "Failed to remove blank pages."
+                            }
+                            onComplete(
+                                if (ok) listOf(File(cacheDir, "FranPdf_NoBlanks_$stamp.pdf")) else emptyList()
+                            )
+                        }
+                    }
+                    is ToolConfig.Ocr -> {
+                        val results = mutableMapOf<Int, OcrPageResult>()
+                        val scope = if (selection == null) {
+                            pages
+                        } else {
+                            pages.filterIndexed { index, _ -> index in selection }
+                        }
+                        for (page in scope) {
+                            val bitmap = repository.renderPageBitmap(
+                                page.originalPageIndex,
+                                page.rotationDegrees,
+                                1.6f
+                            ) ?: continue
+                            val result = try {
+                                ocrEngine.recognize(page.pageIndex, bitmap)
+                            } finally {
+                                bitmap.recycle()
+                            }
+                            if (result != null && result.text.isNotBlank()) {
+                                results[page.pageIndex] = result
+                            }
+                        }
+                        if (results.isEmpty()) {
+                            _statusMessage.value = "OCR found no text on these pages."
+                            onComplete(emptyList())
+                        } else {
+                            // Index the recognised text so the in-app search reaches scanned pages.
+                            _pages.value = _pages.value.map { page ->
+                                results[page.pageIndex]?.let { page.copy(textContent = it.text) } ?: page
+                            }
+                            val target = File(cacheDir, "FranPdf_OCR_$stamp.pdf")
+                            val ok = repository.exportWithOcrLayer(pages, results, target)
+                            _statusMessage.value = if (ok) {
+                                "OCR added a text layer to ${results.size} page(s)."
+                            } else {
+                                "Failed to write the searchable PDF."
+                            }
+                            onComplete(if (ok) listOf(target) else emptyList())
+                        }
+                    }
+                    is ToolConfig.Split -> {
+                        val ranges = ToolPlanner.rangesFromSpec(config.settings.ranges, pages.size)
+                        val chunks = ranges ?: ToolPlanner.chunks(pages.size, config.settings.pagesPerFile)
+                        val files = repository.splitIntoFiles(
+                            pages = pages,
+                            chunks = chunks,
+                            annotations = _annotations.value,
+                            edits = _edits.value,
+                            formFields = _formFields.value,
+                            targetDirectory = cacheDir,
+                            namePrefix = "FranPdf_Split_$stamp"
+                        )
+                        _statusMessage.value = if (files.isEmpty()) {
+                            "Nothing to split."
+                        } else {
+                            "Split into ${files.size} document(s)."
+                        }
+                        onComplete(files)
+                    }
+                    is ToolConfig.Extract -> {
+                        val ranges = ToolPlanner.rangesFromSpec(config.ranges, pages.size)
+                        val indexes = ranges?.flatten()?.distinct()?.sorted()
+                        if (indexes.isNullOrEmpty()) {
+                            _statusMessage.value = "Enter the pages to keep, for example 1-3,5."
+                            onComplete(emptyList())
+                        } else {
+                            val subset = indexes.mapNotNull { pages.getOrNull(it) }
+                            val target = File(cacheDir, "FranPdf_Extract_$stamp.pdf")
+                            val ok = repository.exportCurrentDocument(
+                                subset,
+                                _annotations.value,
+                                _edits.value,
+                                _formFields.value,
+                                target
+                            )
+                            _statusMessage.value = if (ok) {
+                                "Extracted ${subset.size} page(s)."
+                            } else {
+                                "Failed to extract pages."
+                            }
+                            onComplete(if (ok) listOf(target) else emptyList())
+                        }
+                    }
+                    is ToolConfig.ToImages -> {
+                        val files = repository.exportPageImages(pages, config.settings, cacheDir)
+                        _statusMessage.value = if (files.isEmpty()) {
+                            "No page image could be written."
+                        } else {
+                            "Exported ${files.size} page image(s)."
+                        }
+                        onComplete(files)
+                    }
+                }
+            } catch (e: Exception) {
+                _statusMessage.value = "Tool failed: ${e.message}"
+                onComplete(emptyList())
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private suspend fun exportPlan(
+        plan: org.rabicraft.app.data.tools.ToolExportPlan,
+        targetFile: File,
+        onComplete: (List<File>) -> Unit
+    ) {
+        if (plan.sheets.isEmpty()) {
+            _statusMessage.value = "Nothing to export."
+            onComplete(emptyList())
+            return
+        }
+        val ok = repository.exportWithPlan(
+            pages = _pages.value,
+            plan = plan,
+            targetFile = targetFile,
+            annotations = _annotations.value,
+            edits = _edits.value,
+            formFields = _formFields.value
+        )
+        _statusMessage.value = if (ok) {
+            "Exported ${targetFile.name} (${plan.sheets.size} page(s))"
+        } else {
+            "Failed to write the treated PDF."
+        }
+        onComplete(if (ok) listOf(targetFile) else emptyList())
+    }
+
+    /** Merges the open document with PDFs picked by the user. */
+    fun mergeDocuments(uris: List<Uri>, onComplete: (File?) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val cacheDir = getApplication<Application>().cacheDir
+                val copies = mutableListOf<File>()
+                for ((index, uri) in uris.withIndex()) {
+                    val file = File(cacheDir, "merge_source_${System.currentTimeMillis()}_$index.pdf")
+                    val copied = withContext(Dispatchers.IO) {
+                        try {
+                            getApplication<Application>().contentResolver
+                                .openInputStream(uri)?.use { input ->
+                                    file.outputStream().use { output -> input.copyTo(output) }
+                                }
+                            true
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            false
+                        }
+                    }
+                    if (copied) copies.add(file)
+                }
+                if (copies.isEmpty()) {
+                    _statusMessage.value = "No PDF could be read to merge."
+                    onComplete(null)
+                    return@launch
+                }
+                val target = File(cacheDir, "FranPdf_Merged_${System.currentTimeMillis()}.pdf")
+                val ok = repository.mergeFiles(_pages.value, copies, target)
+                _statusMessage.value = if (ok) {
+                    "Merged ${_pages.value.size} page(s) with ${copies.size} document(s)."
+                } else {
+                    "Failed to merge documents."
+                }
+                onComplete(if (ok) target else null)
+            } catch (e: Exception) {
+                _statusMessage.value = "Merge failed: ${e.message}"
+                onComplete(null)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun clearStatusMessage() {
         _statusMessage.value = null
     }
@@ -784,6 +1062,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
 
     override fun onCleared() {
         super.onCleared()
+        ocrEngine.close()
         repository.closeCurrentRenderer()
     }
 }

@@ -17,10 +17,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.rabicraft.app.data.export.OverlayOp
 import org.rabicraft.app.data.export.PageExportPlan
+import org.rabicraft.app.data.ocr.OcrPageResult
+import org.rabicraft.app.data.tools.ToolExportPlan
+import org.rabicraft.app.data.tools.ToolRenderer
 import org.rabicraft.app.model.AnnotationItem
 import org.rabicraft.app.model.BookmarkItem
 import org.rabicraft.app.model.DocumentPermissions
 import org.rabicraft.app.model.FormFieldItem
+import org.rabicraft.app.model.ImageExportSettings
 import org.rabicraft.app.model.PageEdit
 import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PdfDocumentInfo
@@ -415,6 +419,304 @@ class PdfRepository(private val context: Context) {
                 combinedPdf.writeTo(out)
             }
             combinedPdf.close()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Writes a PDF from a tool plan: cropped, tinted, imposed and stamped source pages land on the
+     * output sheets exactly where [ToolPlanner][org.rabicraft.app.data.tools.ToolPlanner] put them.
+     */
+    suspend fun exportWithPlan(
+        pages: List<PageItem>,
+        plan: ToolExportPlan,
+        targetFile: File,
+        annotations: Map<Int, List<AnnotationItem>> = emptyMap(),
+        edits: Map<Int, List<PageEdit>> = emptyMap(),
+        formFields: List<FormFieldItem> = emptyList()
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (plan.sheets.isEmpty()) return@withContext false
+        val scale = (plan.renderDpi.coerceIn(36, 600) / 72f)
+        try {
+            val document = PdfDocument()
+            for ((sheetIndex, sheet) in plan.sheets.withIndex()) {
+                val pageInfo = PdfDocument.PageInfo.Builder(
+                    plan.sheetWidthPt.coerceAtLeast(1),
+                    plan.sheetHeightPt.coerceAtLeast(1),
+                    sheetIndex + 1
+                ).create()
+                val outPage = document.startPage(pageInfo)
+                for (slot in sheet.slots) {
+                    val item = pages.getOrNull(slot.sourcePageIndex) ?: continue
+                    var bitmap = renderPageBitmap(
+                        item.originalPageIndex,
+                        item.rotationDegrees,
+                        scale = scale
+                    ) ?: continue
+                    // Rotated pages come back immutable, and a Canvas needs a mutable bitmap.
+                    if (!bitmap.isMutable) {
+                        val mutable = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                        if (mutable != null) {
+                            bitmap.recycle()
+                            bitmap = mutable
+                        }
+                    }
+                    // Keep the user's markup: tools must not silently drop annotations or edits.
+                    val markup = PageExportPlan.overlayOps(
+                        pageWidth = bitmap.width.toFloat(),
+                        pageHeight = bitmap.height.toFloat(),
+                        scale = scale,
+                        annotations = annotations[item.pageIndex].orEmpty(),
+                        formFields = formFields.filter { it.pageIndex == item.pageIndex },
+                        edits = edits[item.pageIndex].orEmpty()
+                    )
+                    if (markup.isNotEmpty()) {
+                        val markupCanvas = Canvas(bitmap)
+                        for (op in markup) drawOverlayOp(markupCanvas, op)
+                    }
+                    val cropped = ToolRenderer.crop(bitmap, slot.crop)
+                    if (cropped !== bitmap) {
+                        bitmap.recycle()
+                        bitmap = cropped
+                    }
+                    val tinted = ToolRenderer.applyEffect(bitmap, slot.effect)
+                    if (tinted !== bitmap) {
+                        bitmap.recycle()
+                        bitmap = tinted
+                    }
+                    if (plan.jpegQuality != null) {
+                        val recompressed = ToolRenderer.jpegRoundTrip(bitmap, plan.jpegQuality)
+                        bitmap.recycle()
+                        bitmap = recompressed
+                    }
+                    val rect = ToolRenderer.slotRect(slot.rect, plan.sheetWidthPt, plan.sheetHeightPt)
+                    ToolRenderer.drawPage(outPage.canvas, bitmap, rect)
+                    for (overlay in slot.overlays) {
+                        ToolRenderer.drawOverlay(outPage.canvas, overlay, rect)
+                    }
+                    if (plan.borders) ToolRenderer.drawFrame(outPage.canvas, rect)
+                    bitmap.recycle()
+                }
+                document.finishPage(outPage)
+            }
+            FileOutputStream(targetFile).use { out -> document.writeTo(out) }
+            document.close()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Share of non-white pixels per page, sampled on a small render. Used by "remove blank pages":
+     * a scanned separator or a section break is almost entirely white.
+     */
+    suspend fun measureInkRatios(pages: List<PageItem>, scale: Float = 0.3f): List<Float> =
+        withContext(Dispatchers.IO) {
+            pages.map { page ->
+                val bitmap = renderPageBitmap(page.originalPageIndex, page.rotationDegrees, scale)
+                    ?: return@map 1f
+                try {
+                    var ink = 0
+                    var sampled = 0
+                    val step = 3
+                    var y = 0
+                    while (y < bitmap.height) {
+                        var x = 0
+                        while (x < bitmap.width) {
+                            val pixel = bitmap.getPixel(x, y)
+                            val alpha = (pixel ushr 24) and 0xFF
+                            if (alpha > 8) {
+                                val luma = 0.299f * ((pixel shr 16) and 0xFF) +
+                                    0.587f * ((pixel shr 8) and 0xFF) +
+                                    0.114f * (pixel and 0xFF)
+                                if (luma < 240f) ink++
+                                sampled++
+                            }
+                            x += step
+                        }
+                        y += step
+                    }
+                    if (sampled == 0) 1f else ink.toFloat() / sampled.toFloat()
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+        }
+
+    /** One image file per page, in [targetDirectory]. */
+    suspend fun exportPageImages(
+        pages: List<PageItem>,
+        settings: ImageExportSettings,
+        targetDirectory: File
+    ): List<File> = withContext(Dispatchers.IO) {
+        val written = mutableListOf<File>()
+        targetDirectory.mkdirs()
+        for ((index, page) in pages.withIndex()) {
+            val bitmap = renderPageBitmap(page.originalPageIndex, page.rotationDegrees, 2f) ?: continue
+            try {
+                val file = File(
+                    targetDirectory,
+                    "FranPdf_page_${(index + 1).toString().padStart(3, '0')}.${ToolRenderer.extensionFor(settings.format)}"
+                )
+                val bytes = ToolRenderer.encodeImage(bitmap, settings.format, settings.jpegQuality)
+                FileOutputStream(file).use { it.write(bytes) }
+                written.add(file)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                bitmap.recycle()
+            }
+        }
+        written
+    }
+
+    /** Writes one PDF per page range, carrying the annotations and edits of those pages. */
+    suspend fun splitIntoFiles(
+        pages: List<PageItem>,
+        chunks: List<IntRange>,
+        annotations: Map<Int, List<AnnotationItem>>,
+        edits: Map<Int, List<PageEdit>>,
+        formFields: List<FormFieldItem>,
+        targetDirectory: File,
+        namePrefix: String
+    ): List<File> = withContext(Dispatchers.IO) {
+        val written = mutableListOf<File>()
+        targetDirectory.mkdirs()
+        for ((index, range) in chunks.withIndex()) {
+            val subset = pages.subList(range.first, range.last + 1)
+            if (subset.isEmpty()) continue
+            val file = File(targetDirectory, "${namePrefix}_part${index + 1}.pdf")
+            val ok = exportCurrentDocument(subset, annotations, edits, formFields, file)
+            if (ok) written.add(file)
+        }
+        written
+    }
+
+    /** Renders the open document, then each extra file, into a single PDF. */
+    suspend fun mergeFiles(
+        pages: List<PageItem>,
+        extraFiles: List<File>,
+        targetFile: File
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val merged = PdfDocument()
+            var pageNumber = 1
+
+            for (page in pages) {
+                val bitmap = renderPageBitmap(page.originalPageIndex, page.rotationDegrees, 1.5f)
+                    ?: continue
+                val (widthPt, heightPt) = PageExportPlan.pageSizeInPoints(bitmap.width, bitmap.height, 1.5f)
+                val info = PdfDocument.PageInfo.Builder(widthPt, heightPt, pageNumber++).create()
+                val outPage = merged.startPage(info)
+                outPage.canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(0f, 0f, widthPt.toFloat(), heightPt.toFloat()),
+                    null
+                )
+                merged.finishPage(outPage)
+                bitmap.recycle()
+            }
+
+            for (extra in extraFiles) {
+                var descriptor: ParcelFileDescriptor? = null
+                var renderer: PdfRenderer? = null
+                try {
+                    descriptor = ParcelFileDescriptor.open(extra, ParcelFileDescriptor.MODE_READ_ONLY)
+                    renderer = PdfRenderer(descriptor)
+                    for (index in 0 until renderer.pageCount) {
+                        var page: PdfRenderer.Page? = null
+                        var bitmap: Bitmap? = null
+                        try {
+                            page = renderer.openPage(index)
+                            val width = (page.width * 1.5f).toInt().coerceIn(80, 2048)
+                            val height = (page.height * 1.5f).toInt().coerceIn(80, 2048)
+                            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            bitmap.eraseColor(Color.WHITE)
+                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        } catch (e: Throwable) {
+                            e.printStackTrace()
+                        } finally {
+                            try { page?.close() } catch (_: Throwable) {}
+                        }
+                        val rendered = bitmap ?: continue
+                        val (widthPt, heightPt) = PageExportPlan.pageSizeInPoints(
+                            rendered.width,
+                            rendered.height,
+                            1.5f
+                        )
+                        val info = PdfDocument.PageInfo.Builder(widthPt, heightPt, pageNumber++).create()
+                        val outPage = merged.startPage(info)
+                        outPage.canvas.drawBitmap(
+                            rendered,
+                            null,
+                            RectF(0f, 0f, widthPt.toFloat(), heightPt.toFloat()),
+                            null
+                        )
+                        merged.finishPage(outPage)
+                        rendered.recycle()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    try { renderer?.close() } catch (_: Throwable) {}
+                    try { descriptor?.close() } catch (_: Throwable) {}
+                }
+            }
+
+            if (pageNumber <= 1) {
+                merged.close()
+                return@withContext false
+            }
+            FileOutputStream(targetFile).use { out -> merged.writeTo(out) }
+            merged.close()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Writes the document with the OCR words baked in as a searchable text layer, so a scanned page
+     * can be found with Ctrl+F in any reader afterwards.
+     */
+    suspend fun exportWithOcrLayer(
+        pages: List<PageItem>,
+        ocrPages: Map<Int, OcrPageResult>,
+        targetFile: File
+    ): Boolean = withContext(Dispatchers.IO) {
+        val scale = 2.0f
+        try {
+            val document = PdfDocument()
+            for ((index, pageItem) in pages.withIndex()) {
+                val bitmap = renderPageBitmap(
+                    pageItem.originalPageIndex,
+                    pageItem.rotationDegrees,
+                    scale
+                ) ?: continue
+                val (widthPt, heightPt) = PageExportPlan.pageSizeInPoints(bitmap.width, bitmap.height, scale)
+                val info = PdfDocument.PageInfo.Builder(widthPt, heightPt, index + 1).create()
+                val outPage = document.startPage(info)
+                outPage.canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(0f, 0f, widthPt.toFloat(), heightPt.toFloat()),
+                    null
+                )
+                ocrPages[pageItem.pageIndex]?.let { result ->
+                    ToolRenderer.drawSearchableText(outPage.canvas, result.words, widthPt, heightPt)
+                }
+                document.finishPage(outPage)
+                bitmap.recycle()
+            }
+            FileOutputStream(targetFile).use { out -> document.writeTo(out) }
+            document.close()
             true
         } catch (e: Exception) {
             e.printStackTrace()
