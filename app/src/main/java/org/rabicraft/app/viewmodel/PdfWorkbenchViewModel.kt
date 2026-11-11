@@ -128,7 +128,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
     // Saved signature stamps
-    private val _savedSignatures = MutableStateFlow<List<String>>(listOf("A. Dumas", "RabiCraft Verified"))
+    private val _savedSignatures = MutableStateFlow<List<String>>(listOf("A. Dumas", "FranPdf Verified"))
     val savedSignatures: StateFlow<List<String>> = _savedSignatures.asStateFlow()
 
     init {
@@ -619,7 +619,7 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val exportFile = File(getApplication<Application>().cacheDir, "RabiCraft_Export_${System.currentTimeMillis()}.pdf")
+                val exportFile = File(getApplication<Application>().cacheDir, "FranPdf_Export_${System.currentTimeMillis()}.pdf")
                 val success = repository.exportCurrentDocument(
                     pages = _pages.value,
                     annotations = _annotations.value,

@@ -120,7 +120,7 @@ class PdfRepository(private val context: Context) {
         val pages = mutableListOf<PageItem>()
 
         val defaultTexts = listOf(
-            "RabiCraft The Open-Source PDF Workbench Document Specimen & Feature Showcase ISO 32000-2",
+            "FranPdf Document Specimen & Feature Showcase ISO 32000-2",
             "Scripts of the World Typography Latin Arabic Hebrew Greek Cyrillic Japanese Korean Devanagari",
             "Native Architecture & Security crates/engine/src/document.rs open_document parse_pdf_header",
             "Interactive Forms & Fill & Sign Alexandre Dumas Full Name Email Address Digital Signature",
@@ -168,8 +168,8 @@ class PdfRepository(private val context: Context) {
             isSample = isSample,
             title = displayName.removeSuffix(".pdf"),
             pdfVersion = "PDF 1.7",
-            author = if (isSample) "RabiCraft Team" else "Document Author",
-            creator = "RabiCraft PDF Workbench",
+            author = if (isSample) "FranPdf Team" else "Document Author",
+            creator = "FranPdf PDF Workbench",
             permissions = DocumentPermissions()
         )
 

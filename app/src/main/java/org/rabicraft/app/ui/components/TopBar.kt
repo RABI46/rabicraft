@@ -65,7 +65,7 @@ fun TopBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(R.drawable.ic_rabicraft_logo),
-                    contentDescription = "RabiCraft Logo",
+                    contentDescription = "FranPdf logo",
                     modifier = Modifier.size(28.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
