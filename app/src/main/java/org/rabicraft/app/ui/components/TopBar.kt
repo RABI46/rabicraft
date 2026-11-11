@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
@@ -53,6 +54,7 @@ fun TopBar(
     onOpenInspector: () -> Unit,
     onOpenDocument: () -> Unit,
     onOpenLanguage: () -> Unit,
+    onOpenTools: () -> Unit,
     onShare: () -> Unit
 ) {
     val strings = LocalStrings.current
@@ -144,6 +146,13 @@ fun TopBar(
                 modifier = Modifier.testTag("language_button")
             ) {
                 Icon(Icons.Default.Translate, contentDescription = strings.language)
+            }
+
+            IconButton(
+                onClick = onOpenTools,
+                modifier = Modifier.testTag("tools_button")
+            ) {
+                Icon(Icons.Default.Build, contentDescription = strings.tools)
             }
 
             IconButton(

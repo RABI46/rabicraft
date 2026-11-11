@@ -85,6 +85,10 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
 
+    // Offline OCR. The Latin model is bundled in the APK, so recognition needs no download,
+    // no network permission and no Play Services.
+    implementation(libs.mlkit.text.recognition)
+
     // Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
