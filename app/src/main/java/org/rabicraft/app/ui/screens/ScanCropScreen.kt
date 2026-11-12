@@ -119,7 +119,7 @@ fun ScanCropScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = strings.cropHint,
+                        text = strings.cropScreenHint,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -156,7 +156,7 @@ fun ScanCropScreen(
                                     val zoomChange = event.calculateZoom()
                                     val centroid = event.calculateCentroid(useCurrent = true)
                                     var next = live
-                                    if (centroid != null && zoomChange != 1f) {
+                                    if (zoomChange != 1f) {
                                         next = next.zoomed(next.zoom * zoomChange, centroid.x, centroid.y)
                                     }
                                     val panChange = event.calculatePan()

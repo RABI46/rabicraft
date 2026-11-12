@@ -27,7 +27,6 @@ import org.rabicraft.app.model.AnnotationType
 import org.rabicraft.app.model.BookmarkItem
 import org.rabicraft.app.model.CommentItem
 import org.rabicraft.app.model.CommentReply
-import android.graphics.Bitmap
 import org.rabicraft.app.model.ColourEffect
 import org.rabicraft.app.model.ComparisonLabels
 import org.rabicraft.app.model.DetectedTextBlock
