@@ -20,7 +20,14 @@ enum class DocumentTool {
     EXTRACT,
     TO_IMAGES,
     OCR,
-    MERGE
+    MERGE,
+    STAMP,
+    EXTRACT_IMAGES,
+    COMPARE,
+    IMAGES_TO_PDF,
+    SCAN_DOCUMENT,
+    CREATE_PDF,
+    DETECT_FIELDS
 }
 
 /** Where a text overlay sits inside its page. */
@@ -79,6 +86,29 @@ data class WatermarkSettings(
     val opacity: Float = 0.18f,
     val diagonal: Boolean = true,
     val selection: String = ""
+)
+
+/**
+ * The ready-made stamps PDF Tech offers (Apache-2.0), same wording and colours: a reviewer taps
+ * "APPROUVÉ" or "BROUILLON" instead of typing the label and picking its colour.
+ */
+enum class StampPreset(val text: String, val colorArgb: Long) {
+    CONFIDENTIEL("CONFIDENTIEL", 0xFFD32F2FL),
+    APPROVED("APPROUVÉ", 0xFF388E3CL),
+    COPY("COPIE", 0xFF1976D2L),
+    DRAFT("BROUILLON", 0xFFF57C00L),
+    CANCELLED("ANNULÉ", 0xFF7B1FA2L),
+    URGENT("URGENT", 0xFFD32F2FL)
+}
+
+/** A diagonal stamp; [firstPageOnly] marks a cover page instead of every sheet. */
+data class StampSettings(
+    val preset: StampPreset = StampPreset.CONFIDENTIEL,
+    val text: String = preset.text,
+    val colorArgb: Long = preset.colorArgb,
+    val opacity: Float = 0.25f,
+    val fontSizePt: Float = 54f,
+    val firstPageOnly: Boolean = false
 )
 
 data class HeaderFooterSettings(
@@ -151,4 +181,6 @@ sealed interface ToolConfig {
     data class Extract(val ranges: String) : ToolConfig
     data class ToImages(val settings: ImageExportSettings) : ToolConfig
     data class Ocr(val selection: String = "") : ToolConfig
+    data class Stamp(val settings: StampSettings) : ToolConfig
+    data object ExtractImages : ToolConfig
 }

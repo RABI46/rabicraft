@@ -11,21 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-/** One recognised word, with its box normalised to the page (0..1 on both axes). */
-data class OcrWord(
-    val text: String,
-    val left: Float,
-    val top: Float,
-    val right: Float,
-    val bottom: Float
-)
-
-data class OcrPageResult(
-    val pageIndex: Int,
-    val text: String,
-    val words: List<OcrWord>
-)
-
 /**
  * Offline OCR through ML Kit's bundled Latin model: recognition runs entirely on the device and the
  * model ships inside the APK, so there is nothing to download and no permission to request. The

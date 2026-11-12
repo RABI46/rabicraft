@@ -27,6 +27,11 @@ import org.rabicraft.app.model.AnnotationType
 import org.rabicraft.app.model.BookmarkItem
 import org.rabicraft.app.model.CommentItem
 import org.rabicraft.app.model.CommentReply
+import android.graphics.Bitmap
+import org.rabicraft.app.model.ColourEffect
+import org.rabicraft.app.model.ComparisonLabels
+import org.rabicraft.app.model.DetectedTextBlock
+import org.rabicraft.app.model.DiffKind
 import org.rabicraft.app.model.EditKind
 import org.rabicraft.app.model.FieldType
 import org.rabicraft.app.model.FormFieldItem
@@ -35,9 +40,12 @@ import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PageLayoutMode
 import org.rabicraft.app.model.PdfDocumentInfo
 import org.rabicraft.app.model.ReadingTheme
+import org.rabicraft.app.model.ScanCorners
+import org.rabicraft.app.model.ScannedPage
 import org.rabicraft.app.model.SearchMatch
 import org.rabicraft.app.model.ToolConfig
 import org.rabicraft.app.model.WorkbenchMode
+import org.rabicraft.app.data.tools.TextBlockPlanner
 import java.io.File
 import java.util.UUID
 
@@ -864,6 +872,20 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
                         }
                         onComplete(files)
                     }
+                    is ToolConfig.Stamp -> exportPlan(
+                        ToolPlanner.stampPlan(pages, config.settings),
+                        File(cacheDir, "FranPdf_Stamp_$stamp.pdf"),
+                        onComplete
+                    )
+                    ToolConfig.ExtractImages -> {
+                        val files = repository.extractEmbeddedImages(cacheDir)
+                        _statusMessage.value = if (files.isEmpty()) {
+                            "No embedded image could be recovered from this PDF."
+                        } else {
+                            "Extracted ${files.size} image(s)."
+                        }
+                        onComplete(files)
+                    }
                 }
             } catch (e: Exception) {
                 _statusMessage.value = "Tool failed: ${e.message}"
@@ -938,6 +960,303 @@ class PdfWorkbenchViewModel(application: Application) : AndroidViewModel(applica
                 onComplete(if (ok) target else null)
             } catch (e: Exception) {
                 _statusMessage.value = "Merge failed: ${e.message}"
+                onComplete(null)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Compares the open document with the PDF at [uri] and writes a side-by-side report.
+     *
+     * The picked file is copied into the cache first: a content URI is not guaranteed to stay
+     * readable while both documents are rendered.
+     */
+    fun compareDocuments(
+        uri: Uri,
+        labels: ComparisonLabels,
+        onComplete: (File?) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val cacheDir = getApplication<Application>().cacheDir
+                val other = File(cacheDir, "compare_source_${System.currentTimeMillis()}.pdf")
+                val copied = withContext(Dispatchers.IO) {
+                    try {
+                        getApplication<Application>().contentResolver
+                            .openInputStream(uri)?.use { input ->
+                                other.outputStream().use { output -> input.copyTo(output) }
+                            }
+                        other.length() > 0
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        false
+                    }
+                }
+                if (!copied) {
+                    _statusMessage.value = "The second PDF could not be read."
+                    onComplete(null)
+                    return@launch
+                }
+                val comparisons = repository.compareDocuments(other, _pages.value)
+                if (comparisons.isEmpty()) {
+                    _statusMessage.value = "Nothing to compare."
+                    onComplete(null)
+                    return@launch
+                }
+                val leftName = _documentInfo.value?.name ?: "Document"
+                val target = File(cacheDir, "FranPdf_Compare_${System.currentTimeMillis()}.pdf")
+                val ok = repository.exportComparisonReport(
+                    comparisons = comparisons,
+                    leftName = leftName,
+                    rightName = other.name,
+                    otherFile = other,
+                    labels = labels,
+                    pages = _pages.value,
+                    targetFile = target
+                )
+                val changed = comparisons.count { it.status != DiffKind.IDENTICAL }
+                _statusMessage.value = if (!ok) {
+                    "Failed to write the comparison report."
+                } else if (changed == 0) {
+                    "Compared ${comparisons.size} page(s): every page is identical."
+                } else {
+                    "Compared ${comparisons.size} page(s): $changed differ from the other PDF."
+                }
+                onComplete(if (ok) target else null)
+            } catch (e: Exception) {
+                _statusMessage.value = "Compare failed: ${e.message}"
+                onComplete(null)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /** Turns the picked pictures into a new PDF, one page per image. */
+    fun createPdfFromImages(uris: List<Uri>, onComplete: (File?) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val cacheDir = getApplication<Application>().cacheDir
+                val target = File(cacheDir, "FranPdf_Images_${System.currentTimeMillis()}.pdf")
+                val pages = repository.imagesToPdf(uris, target)
+                _statusMessage.value = if (pages == 0) {
+                    "No picked image could be read."
+                } else {
+                    "Wrote $pages image page(s) to ${target.name}."
+                }
+                onComplete(if (pages > 0) target else null)
+            } catch (e: Exception) {
+                _statusMessage.value = "Images to PDF failed: ${e.message}"
+                onComplete(null)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Recognises the text of the current page offline and hands back one block per visible line.
+     *
+     * This is what makes text on a rendered page editable: the page is a picture, so the blocks
+     * are the coordinates the editor can cover with a whiteout and rewrite.
+     */
+    fun detectTextBlocks(onResult: (List<DetectedTextBlock>) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val pageIndex = _currentPageIndex.value
+                val page = _pages.value.getOrNull(pageIndex)
+                if (page == null) {
+                    _statusMessage.value = "Open a page before editing its text."
+                    onResult(emptyList())
+                    return@launch
+                }
+                val bitmap = repository.renderPageBitmap(
+                    page.originalPageIndex,
+                    page.rotationDegrees,
+                    1.6f
+                )
+                if (bitmap == null) {
+                    _statusMessage.value = "This page could not be rendered."
+                    onResult(emptyList())
+                    return@launch
+                }
+                val result = try {
+                    ocrEngine.recognize(page.pageIndex, bitmap)
+                } finally {
+                    bitmap.recycle()
+                }
+                val blocks = result?.let { TextBlockPlanner.groupLines(it.words) }.orEmpty()
+                _statusMessage.value = if (blocks.isEmpty()) {
+                    "No text was recognised on this page."
+                } else {
+                    "${blocks.size} text line(s) recognised."
+                }
+                onResult(blocks)
+            } catch (e: Exception) {
+                _statusMessage.value = "Text detection failed: ${e.message}"
+                onResult(emptyList())
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /** Covers a recognised line and writes the replacement on top; blank text removes it. */
+    fun replaceTextBlock(pageIndex: Int, block: DetectedTextBlock, newText: String) {
+        val left = (block.left - 0.004f).coerceIn(0f, 1f)
+        val top = (block.top - 0.004f).coerceIn(0f, 1f)
+        val width = (block.width + 0.008f).coerceIn(0.02f, (1f - left).coerceAtLeast(0.02f))
+        val height = (block.height * 1.3f).coerceIn(0.01f, (1f - top).coerceAtLeast(0.01f))
+        appendEdit(
+            PageEdit(
+                id = UUID.randomUUID().toString(),
+                pageIndex = pageIndex,
+                kind = EditKind.WHITEOUT,
+                xRatio = left,
+                yRatio = top,
+                widthRatio = width,
+                heightRatio = height
+            )
+        )
+        val replacement = newText.trim()
+        if (replacement.isNotEmpty()) {
+            val text = PageEdit(
+                id = UUID.randomUUID().toString(),
+                pageIndex = pageIndex,
+                kind = EditKind.TEXT,
+                xRatio = block.left.coerceIn(0f, 0.95f),
+                yRatio = block.top.coerceIn(0f, 0.95f),
+                widthRatio = block.width.coerceIn(0.05f, 0.95f),
+                heightRatio = (block.height * 1.2f).coerceIn(0.012f, 0.5f),
+                text = replacement,
+                colorArgb = 0xFF18181BL,
+                fontSizeRatio = (block.height * 0.75f).coerceIn(0.008f, 0.12f)
+            )
+            appendEdit(text)
+            _selectedEditId.value = text.id
+        }
+        _statusMessage.value = if (replacement.isEmpty()) "Text removed." else "Text replaced."
+    }
+
+    fun deleteTextBlock(pageIndex: Int, block: DetectedTextBlock) {
+        replaceTextBlock(pageIndex, block, "")
+    }
+
+    /** Finds the fillable areas of the document and switches to fill & sign on them. */
+    fun detectFormFields() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val fields = repository.detectFormFields(_pages.value)
+                _formFields.value = fields
+                if (fields.isEmpty()) {
+                    _statusMessage.value = "No fillable area was found in this document."
+                } else {
+                    _workbenchMode.value = WorkbenchMode.FILL_SIGN
+                    _statusMessage.value = "${fields.size} fillable area(s) detected."
+                }
+            } catch (e: Exception) {
+                _statusMessage.value = "Area detection failed: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /** Writes the document typed in the "create a PDF" editor. */
+    fun createTextPdf(
+        title: String,
+        body: String,
+        pageWidthPt: Int,
+        pageHeightPt: Int,
+        baseSizePt: Float,
+        onComplete: (File?) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val cacheDir = getApplication<Application>().cacheDir
+                val target = File(cacheDir, "FranPdf_Created_${System.currentTimeMillis()}.pdf")
+                val ok = repository.createTextPdf(
+                    title = title,
+                    body = body,
+                    pageWidthPt = pageWidthPt,
+                    pageHeightPt = pageHeightPt,
+                    baseSizePt = baseSizePt,
+                    targetFile = target
+                )
+                _statusMessage.value = if (ok) {
+                    "Wrote ${target.name}."
+                } else {
+                    "Write a title or some text first."
+                }
+                onComplete(if (ok) target else null)
+            } catch (e: Exception) {
+                _statusMessage.value = "Create failed: ${e.message}"
+                onComplete(null)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /** Loads a captured page with the corners found on it, for the adjustment screen. */
+    fun loadScanPreview(file: File, onReady: (Bitmap?, ScanCorners?) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val (bitmap, corners) = repository.scanPreview(file)
+                if (bitmap == null) {
+                    _statusMessage.value = "The captured page could not be read."
+                }
+                onReady(bitmap, corners)
+            } catch (e: Exception) {
+                _statusMessage.value = "Preview failed: ${e.message}"
+                onReady(null, null)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Gathers the pages captured by the scanner into a single PDF.
+     *
+     * Each page carries the corners confirmed in the adjustment screen; [enhance] then pushes the
+     * contrast so pencil and print stay legible.
+     */
+    fun createScannedPdf(
+        pages: List<ScannedPage>,
+        enhance: Boolean,
+        onComplete: (File?) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                if (pages.isEmpty()) {
+                    onComplete(null)
+                    return@launch
+                }
+                val cacheDir = getApplication<Application>().cacheDir
+                val target = File(cacheDir, "FranPdf_Scan_${System.currentTimeMillis()}.pdf")
+                val written = repository.scannedPagesToPdf(
+                    pages = pages,
+                    targetFile = target,
+                    effect = if (enhance) ColourEffect.HIGH_CONTRAST else ColourEffect.NONE
+                )
+                _statusMessage.value = if (written == 0) {
+                    "The captured pages could not be read."
+                } else {
+                    "Scanned $written page(s) into ${target.name}."
+                }
+                onComplete(if (written > 0) target else null)
+            } catch (e: Exception) {
+                _statusMessage.value = "Scan failed: ${e.message}"
                 onComplete(null)
             } finally {
                 _isLoading.value = false

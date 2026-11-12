@@ -7,6 +7,7 @@ import org.rabicraft.app.model.HeaderFooterSettings
 import org.rabicraft.app.model.NUpSettings
 import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PageNumberSettings
+import org.rabicraft.app.model.StampSettings
 import org.rabicraft.app.model.TextAnchor
 import org.rabicraft.app.model.ToolText
 import org.rabicraft.app.model.WatermarkSettings
@@ -235,6 +236,60 @@ object ToolPlanner {
                 )
             )
         }
+    }
+
+    /** Stamps every page, or only the cover, with the preset's wording, colour and opacity. */
+    fun stampPlan(pages: List<PageItem>, settings: StampSettings): ToolExportPlan {
+        if (settings.text.isBlank() || pages.isEmpty()) {
+            return ToolExportPlan(emptyList(), 595, 842)
+        }
+        return sequentialPlan(pages = pages) { index, _ ->
+            if (settings.firstPageOnly && index != 0) {
+                emptyList()
+            } else {
+                listOf(
+                    TextOverlay(
+                        text = settings.text,
+                        anchor = TextAnchor.CENTRE,
+                        fontSizePt = settings.fontSizePt,
+                        colorArgb = settings.colorArgb,
+                        bold = true,
+                        opacity = settings.opacity,
+                        insetPt = 0f,
+                        rotationDegrees = -45f
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * Centres an image on a sheet, scaled to fit inside [marginPt] while keeping its aspect ratio.
+     * Used by "images to PDF": a portrait photo and a panorama both land on the same A4 sheet.
+     */
+    fun fitSlot(
+        imageWidth: Int,
+        imageHeight: Int,
+        sheetWidthPt: Int,
+        sheetHeightPt: Int,
+        marginPt: Float
+    ): SlotRect {
+        val sheetWidth = sheetWidthPt.toFloat().coerceAtLeast(1f)
+        val sheetHeight = sheetHeightPt.toFloat().coerceAtLeast(1f)
+        val margin = marginPt.coerceIn(0f, min(sheetWidth, sheetHeight) / 3f)
+        val availableWidth = (sheetWidth - 2f * margin).coerceAtLeast(1f)
+        val availableHeight = (sheetHeight - 2f * margin).coerceAtLeast(1f)
+        val safeImageWidth = imageWidth.coerceAtLeast(1).toFloat()
+        val safeImageHeight = imageHeight.coerceAtLeast(1).toFloat()
+        val scale = min(availableWidth / safeImageWidth, availableHeight / safeImageHeight)
+        val width = (safeImageWidth * scale).coerceAtMost(availableWidth)
+        val height = (safeImageHeight * scale).coerceAtMost(availableHeight)
+        return SlotRect(
+            left = (sheetWidth - width) / 2f / sheetWidth,
+            top = (sheetHeight - height) / 2f / sheetHeight,
+            width = width / sheetWidth,
+            height = height / sheetHeight
+        )
     }
 
     fun headerFooterPlan(

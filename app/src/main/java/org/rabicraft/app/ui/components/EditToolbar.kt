@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatColorReset
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
@@ -47,6 +48,7 @@ import org.rabicraft.app.ui.i18n.LocalStrings
 /** Actions offered by the Edit PDF menu. */
 enum class EditAction {
     ADD_TEXT,
+    EDIT_TEXT,
     ADD_IMAGE,
     ADD_SHAPE,
     WHITEOUT,
@@ -74,6 +76,9 @@ fun EditToolbar(
             ) {
                 EditButton(Icons.Default.TextFields, strings.addText, "edit_add_text") {
                     onAction(EditAction.ADD_TEXT)
+                }
+                EditButton(Icons.Default.Edit, strings.editText, "edit_edit_text") {
+                    onAction(EditAction.EDIT_TEXT)
                 }
                 EditButton(Icons.Default.AddPhotoAlternate, strings.addImage, "edit_add_image") {
                     onAction(EditAction.ADD_IMAGE)

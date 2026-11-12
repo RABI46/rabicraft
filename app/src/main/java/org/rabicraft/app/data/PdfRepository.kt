@@ -2,6 +2,7 @@ package org.rabicraft.app.data
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
@@ -18,19 +19,57 @@ import kotlinx.coroutines.withContext
 import org.rabicraft.app.data.export.OverlayOp
 import org.rabicraft.app.data.export.PageExportPlan
 import org.rabicraft.app.data.ocr.OcrPageResult
+import org.rabicraft.app.data.tools.DocumentEdgeDetector
+import org.rabicraft.app.data.tools.EmbeddedImageScanner
+import org.rabicraft.app.data.tools.FormFieldDetector
+import org.rabicraft.app.data.tools.PageDiff
+import org.rabicraft.app.data.tools.TextBlock
+import org.rabicraft.app.data.tools.TextBlockKind
+import org.rabicraft.app.data.tools.TextLayout
+import org.rabicraft.app.data.tools.TextOverlay
 import org.rabicraft.app.data.tools.ToolExportPlan
+import org.rabicraft.app.data.tools.ToolPlanner
 import org.rabicraft.app.data.tools.ToolRenderer
 import org.rabicraft.app.model.AnnotationItem
 import org.rabicraft.app.model.BookmarkItem
+import org.rabicraft.app.model.ColourEffect
+import org.rabicraft.app.model.ComparisonLabels
+import org.rabicraft.app.model.DiffKind
 import org.rabicraft.app.model.DocumentPermissions
+import org.rabicraft.app.model.FieldType
 import org.rabicraft.app.model.FormFieldItem
 import org.rabicraft.app.model.ImageExportSettings
+import org.rabicraft.app.model.PageComparison
 import org.rabicraft.app.model.PageEdit
 import org.rabicraft.app.model.PageItem
 import org.rabicraft.app.model.PdfDocumentInfo
+import org.rabicraft.app.model.ScanCorners
+import org.rabicraft.app.model.ScannedPage
+import org.rabicraft.app.model.TextAnchor
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import kotlin.math.abs
+import kotlin.math.sqrt
+
+/** Comparison sheets are landscape A4: two pages side by side, captions underneath. */
+private const val COMPARISON_SHEET_WIDTH = 842
+private const val COMPARISON_SHEET_HEIGHT = 595
+private const val COMPARISON_THUMB_SCALE = 0.35f
+private const val COMPARISON_REPORT_SCALE = 0.9f
+private const val COMPARISON_MAX_PAGES = 200
+
+/** Image extraction reads the whole file, so it stays under a size a phone can hold twice. */
+private const val MAX_EMBEDDED_SOURCE_BYTES = 200L * 1024L * 1024L
+
+private const val TEXT_PDF_MARGIN_PT = 56f
+private const val FIELDS_PER_PAGE = 12
+
+private const val IMAGE_PDF_SHEET_WIDTH = 595
+private const val IMAGE_PDF_SHEET_HEIGHT = 842
+private const val IMAGE_PDF_MAX_PAGES = 100
+private const val IMAGE_PDF_MAX_EDGE = 1600
+private const val SCAN_PREVIEW_MAX_EDGE = 1400
 
 class PdfRepository(private val context: Context) {
 
@@ -547,6 +586,566 @@ class PdfRepository(private val context: Context) {
                 }
             }
         }
+
+    /**
+     * One file per picture embedded in the open PDF, written into [targetDirectory].
+     *
+     * Pictures stored as Flate-compressed pixels cannot be recovered this way, so a fully scanned
+     * PDF may yield nothing even though it visibly contains images.
+     */
+    suspend fun extractEmbeddedImages(targetDirectory: File): List<File> = withContext(Dispatchers.IO) {
+        val source = activePdfFile ?: return@withContext emptyList()
+        if (!source.exists()) return@withContext emptyList()
+        if (source.length() > MAX_EMBEDDED_SOURCE_BYTES) return@withContext emptyList()
+        val bytes = try {
+            source.readBytes()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext emptyList()
+        }
+        val images = EmbeddedImageScanner.scan(bytes)
+        if (images.isEmpty()) return@withContext emptyList()
+        targetDirectory.mkdirs()
+        val written = mutableListOf<File>()
+        for ((index, image) in images.withIndex()) {
+            val file = File(
+                targetDirectory,
+                "FranPdf_image_${(index + 1).toString().padStart(3, '0')}.${image.extension}"
+            )
+            try {
+                FileOutputStream(file).use { it.write(image.bytes) }
+                written.add(file)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        written
+    }
+
+    /**
+     * Compares the open document with [otherFile] page by page.
+     *
+     * Both sides are rendered small and sampled into thumbnails, then compared pixel by pixel (see
+     * [PageDiff]). Pages whose aspect ratio differs by more than 2 % are reported as a size
+     * mismatch instead of a pixel difference, because stretching them would compare nothing.
+     */
+    suspend fun compareDocuments(
+        otherFile: File,
+        pages: List<PageItem>,
+        maxPages: Int = COMPARISON_MAX_PAGES
+    ): List<PageComparison> = withContext(Dispatchers.IO) {
+        val leftItems = pages.ifEmpty { defaultPageItems() }
+        if (leftItems.isEmpty()) return@withContext emptyList()
+        val opened = openRenderer(otherFile) ?: return@withContext emptyList()
+        try {
+            val total = minOf(
+                maxOf(leftItems.size, opened.renderer.pageCount),
+                maxPages.coerceAtLeast(1)
+            )
+            val results = mutableListOf<PageComparison>()
+            for (index in 0 until total) {
+                val item = leftItems.getOrNull(index)
+                val left = item?.let {
+                    renderPageBitmap(it.originalPageIndex, it.rotationDegrees, COMPARISON_THUMB_SCALE)
+                }
+                val right = if (index < opened.renderer.pageCount) {
+                    renderPageFrom(opened.renderer, index, COMPARISON_THUMB_SCALE)
+                } else {
+                    null
+                }
+                results.add(comparePair(index + 1, left, right))
+                left?.recycle()
+                right?.recycle()
+            }
+            results
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        } finally {
+            opened.close()
+        }
+    }
+
+    /** Writes the comparison as a landscape A4 report: the two pages side by side, verdict above. */
+    suspend fun exportComparisonReport(
+        comparisons: List<PageComparison>,
+        leftName: String,
+        rightName: String,
+        otherFile: File,
+        labels: ComparisonLabels,
+        pages: List<PageItem>,
+        targetFile: File
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (comparisons.isEmpty()) return@withContext false
+        val leftItems = pages.ifEmpty { defaultPageItems() }
+        val opened = openRenderer(otherFile) ?: return@withContext false
+        try {
+            val document = PdfDocument()
+            val sheetWidth = COMPARISON_SHEET_WIDTH.toFloat()
+            val sheetHeight = COMPARISON_SHEET_HEIGHT.toFloat()
+            val slotWidth = (sheetWidth - 48f) / 2f
+            val slotHeight = sheetHeight - 74f
+            for ((index, comparison) in comparisons.withIndex()) {
+                val info = PdfDocument.PageInfo.Builder(
+                    COMPARISON_SHEET_WIDTH,
+                    COMPARISON_SHEET_HEIGHT,
+                    index + 1
+                ).create()
+                val page = document.startPage(info)
+                val item = leftItems.getOrNull(index)
+                val left = item?.let {
+                    renderPageBitmap(it.originalPageIndex, it.rotationDegrees, COMPARISON_REPORT_SCALE)
+                }
+                val right = if (index < opened.renderer.pageCount) {
+                    renderPageFrom(opened.renderer, index, COMPARISON_REPORT_SCALE)
+                } else {
+                    null
+                }
+                ToolRenderer.drawOverlay(
+                    page.canvas,
+                    TextOverlay(
+                        text = comparisonLabel(comparison, labels),
+                        anchor = TextAnchor.TOP_LEFT,
+                        fontSizePt = 12f,
+                        colorArgb = 0xFF111827L,
+                        bold = true,
+                        opacity = 1f,
+                        insetPt = 14f,
+                        rotationDegrees = 0f
+                    ),
+                    RectF(0f, 0f, sheetWidth, 34f)
+                )
+                val leftRect = RectF(16f, 40f, 16f + slotWidth, 40f + slotHeight)
+                val rightRect = RectF(32f + slotWidth, 40f, 32f + slotWidth * 2f, 40f + slotHeight)
+                left?.let { ToolRenderer.drawPage(page.canvas, it, leftRect) }
+                right?.let { ToolRenderer.drawPage(page.canvas, it, rightRect) }
+                val captionTop = 40f + slotHeight + 4f
+                caption(page.canvas, leftName, RectF(16f, captionTop, 16f + slotWidth, sheetHeight - 2f))
+                caption(
+                    page.canvas,
+                    rightName,
+                    RectF(32f + slotWidth, captionTop, 32f + slotWidth * 2f, sheetHeight - 2f)
+                )
+                document.finishPage(page)
+                left?.recycle()
+                right?.recycle()
+            }
+            FileOutputStream(targetFile).use { document.writeTo(it) }
+            document.close()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        } finally {
+            opened.close()
+        }
+    }
+
+    /**
+     * One A4 page per picked picture, scaled to fit and centred. Returns the pages written.
+     *
+     * [effect] is how a photographed page is made readable: scans usually want the high-contrast
+     * pass, while pictures should keep their colours.
+     */
+    suspend fun imagesToPdf(
+        uris: List<Uri>,
+        targetFile: File,
+        effect: ColourEffect = ColourEffect.NONE
+    ): Int = withContext(Dispatchers.IO) {
+        val bitmaps = mutableListOf<Bitmap>()
+        try {
+            for (uri in uris.take(IMAGE_PDF_MAX_PAGES)) {
+                val decoded = decodeImage(uri) ?: continue
+                val treated = ToolRenderer.applyEffect(decoded, effect)
+                if (treated !== decoded) decoded.recycle()
+                bitmaps.add(treated)
+            }
+            writeImagePages(bitmaps, targetFile)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            0
+        } finally {
+            for (bitmap in bitmaps) bitmap.recycle()
+        }
+    }
+
+    /**
+     * Writes a paginated PDF from the "create a PDF" editor.
+     *
+     * The body is laid out by [TextLayout], which decides where lines wrap and where pages break;
+     * this method only paints the lines it is given.
+     */
+    suspend fun createTextPdf(
+        title: String,
+        body: String,
+        pageWidthPt: Int,
+        pageHeightPt: Int,
+        baseSizePt: Float,
+        targetFile: File
+    ): Boolean = withContext(Dispatchers.IO) {
+        val width = pageWidthPt.coerceIn(200, 2000)
+        val height = pageHeightPt.coerceIn(200, 3000)
+        val margin = TEXT_PDF_MARGIN_PT
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+        val measure = { text: String, size: Float ->
+            paint.textSize = size
+            paint.measureText(text)
+        }
+        val blocks = buildList {
+            if (title.isNotBlank()) add(TextBlock(TextBlockKind.TITLE, title.trim()))
+            addAll(TextLayout.parse(body))
+        }
+        if (blocks.isEmpty()) return@withContext false
+        val lines = TextLayout.wrapAll(blocks, baseSizePt, width - 2 * margin, measure)
+        val pages = TextLayout.paginate(lines, baseSizePt, height.toFloat(), margin, margin)
+        if (pages.isEmpty()) return@withContext false
+        try {
+            val document = PdfDocument()
+            try {
+                for ((index, pageLines) in pages.withIndex()) {
+                    val info = PdfDocument.PageInfo.Builder(width, height, index + 1).create()
+                    val page = document.startPage(info)
+                    var top = margin
+                    for (line in pageLines) {
+                        val size = baseSizePt * TextLayout.sizeFactor(line.kind)
+                        paint.textSize = size
+                        paint.typeface = if (
+                            line.kind == TextBlockKind.TITLE || line.kind == TextBlockKind.HEADING
+                        ) {
+                            Typeface.DEFAULT_BOLD
+                        } else {
+                            Typeface.DEFAULT
+                        }
+                        page.canvas.drawText(line.text, margin, top + size, paint)
+                        top += TextLayout.lineHeight(baseSizePt, line.kind)
+                    }
+                    document.finishPage(page)
+                }
+                FileOutputStream(targetFile).use { document.writeTo(it) }
+            } finally {
+                document.close()
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Fillable areas found on the first [maxPages] pages, shaped like the document's own form
+     * fields so fill & sign can type into them.
+     */
+    suspend fun detectFormFields(
+        pages: List<PageItem>,
+        maxPages: Int = 30
+    ): List<FormFieldItem> = withContext(Dispatchers.IO) {
+        val fields = mutableListOf<FormFieldItem>()
+        for (page in pages.take(maxPages)) {
+            val bitmap = renderPageBitmap(page.originalPageIndex, page.rotationDegrees, 1.2f)
+                ?: continue
+            val width = bitmap.width
+            val height = bitmap.height
+            val pixels = IntArray(width * height)
+            try {
+                bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            } finally {
+                bitmap.recycle()
+            }
+            val detected = FormFieldDetector.detect(pixels, width, height)
+            for (rect in detected.take(FIELDS_PER_PAGE)) {
+                fields.add(
+                    FormFieldItem(
+                        id = "field-${page.pageIndex}-${fields.size}",
+                        pageIndex = page.pageIndex,
+                        label = "Zone ${fields.size + 1}",
+                        type = if (rect.height > 0.05f) FieldType.SIGNATURE else FieldType.TEXT,
+                        xRatio = rect.left,
+                        yRatio = rect.top,
+                        widthRatio = rect.width.coerceAtLeast(0.02f),
+                        heightRatio = rect.height.coerceAtLeast(0.012f)
+                    )
+                )
+            }
+        }
+        fields
+    }
+
+    /**
+     * A preview of a captured page together with the corners found on it, for the adjustment
+     * screen. The corners are null when no convincing sheet was recognised, and the screen then
+     * starts from the edges of the photo.
+     */
+    suspend fun scanPreview(
+        file: File,
+        maxEdge: Int = SCAN_PREVIEW_MAX_EDGE
+    ): Pair<Bitmap?, ScanCorners?> = withContext(Dispatchers.IO) {
+        val bitmap = decodeImage(Uri.fromFile(file), maxEdge)
+            ?: return@withContext Pair(null, null)
+        val corners = try {
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            DocumentEdgeDetector.detect(pixels, bitmap.width, bitmap.height)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+        Pair(bitmap, corners)
+    }
+
+    /**
+     * The scanner's pages as one PDF, each warped with the corners the user confirmed. A page the
+     * user chose to keep as photographed has null corners and is drawn untouched.
+     */
+    suspend fun scannedPagesToPdf(
+        pages: List<ScannedPage>,
+        targetFile: File,
+        effect: ColourEffect = ColourEffect.NONE
+    ): Int = withContext(Dispatchers.IO) {
+        val bitmaps = mutableListOf<Bitmap>()
+        try {
+            for (page in pages.take(IMAGE_PDF_MAX_PAGES)) {
+                var decoded = decodeImage(Uri.fromFile(page.file)) ?: continue
+                val corners = page.corners
+                if (corners != null) decoded = warpToPage(decoded, corners)
+                val treated = ToolRenderer.applyEffect(decoded, effect)
+                if (treated !== decoded) decoded.recycle()
+                bitmaps.add(treated)
+            }
+            writeImagePages(bitmaps, targetFile)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            0
+        } finally {
+            for (bitmap in bitmaps) bitmap.recycle()
+        }
+    }
+
+    /** One A4 page per bitmap, scaled to fit and centred. The caller owns and recycles [bitmaps]. */
+    private fun writeImagePages(bitmaps: List<Bitmap>, targetFile: File): Int {
+        if (bitmaps.isEmpty()) return 0
+        val document = PdfDocument()
+        try {
+            for ((index, bitmap) in bitmaps.withIndex()) {
+                val info = PdfDocument.PageInfo.Builder(
+                    IMAGE_PDF_SHEET_WIDTH,
+                    IMAGE_PDF_SHEET_HEIGHT,
+                    index + 1
+                ).create()
+                val page = document.startPage(info)
+                val slot = ToolPlanner.fitSlot(
+                    imageWidth = bitmap.width,
+                    imageHeight = bitmap.height,
+                    sheetWidthPt = IMAGE_PDF_SHEET_WIDTH,
+                    sheetHeightPt = IMAGE_PDF_SHEET_HEIGHT,
+                    marginPt = 18f
+                )
+                ToolRenderer.drawPage(
+                    page.canvas,
+                    bitmap,
+                    ToolRenderer.slotRect(slot, IMAGE_PDF_SHEET_WIDTH, IMAGE_PDF_SHEET_HEIGHT)
+                )
+                document.finishPage(page)
+            }
+            FileOutputStream(targetFile).use { document.writeTo(it) }
+        } finally {
+            document.close()
+        }
+        return bitmaps.size
+    }
+
+    private fun warpToPage(bitmap: Bitmap, corners: ScanCorners): Bitmap {
+        val width = bitmap.width.toFloat()
+        val height = bitmap.height.toFloat()
+        val source = floatArrayOf(
+            corners.topLeftX * width, corners.topLeftY * height,
+            corners.topRightX * width, corners.topRightY * height,
+            corners.bottomRightX * width, corners.bottomRightY * height,
+            corners.bottomLeftX * width, corners.bottomLeftY * height
+        )
+        val outputWidth = maxOf(distance(source, 0, 2), distance(source, 6, 4))
+            .toInt()
+            .coerceIn(64, 4096)
+        val outputHeight = maxOf(distance(source, 0, 6), distance(source, 2, 4))
+            .toInt()
+            .coerceIn(64, 4096)
+        val target = floatArrayOf(
+            0f, 0f,
+            outputWidth.toFloat(), 0f,
+            outputWidth.toFloat(), outputHeight.toFloat(),
+            0f, outputHeight.toFloat()
+        )
+        val matrix = Matrix()
+        if (!matrix.setPolyToPoly(source, 0, target, 0, 4)) return bitmap
+        val output = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        // Corners rarely land exactly on the picture edge; paper-coloured backing blends the seam.
+        canvas.drawColor(Color.WHITE)
+        canvas.drawBitmap(bitmap, matrix, Paint(Paint.FILTER_BITMAP_FLAG))
+        if (output !== bitmap) bitmap.recycle()
+        return output
+    }
+
+    private fun distance(points: FloatArray, first: Int, second: Int): Float {
+        val dx = points[first] - points[second]
+        val dy = points[first + 1] - points[second + 1]
+        return sqrt(dx * dx + dy * dy)
+    }
+
+    /** Decodes a picked image, downsampled so a 50 MP photo does not fill the heap. */
+    private fun decodeImage(uri: Uri, maxEdge: Int = IMAGE_PDF_MAX_EDGE): Bitmap? = try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            null
+        } else {
+            var sample = 1
+            while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > maxEdge) sample *= 2
+            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, options)
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+
+    private fun defaultPageItems(): List<PageItem> {
+        val count = currentRenderer?.pageCount ?: 0
+        return (0 until count).map { index ->
+            PageItem(pageIndex = index, originalPageIndex = index, label = "#${index + 1}")
+        }
+    }
+
+    private class OpenRenderer(
+        val renderer: PdfRenderer,
+        private val descriptor: ParcelFileDescriptor
+    ) {
+        fun close() {
+            try {
+                renderer.close()
+            } catch (_: Throwable) {
+            }
+            try {
+                descriptor.close()
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    private fun openRenderer(file: File): OpenRenderer? {
+        var descriptor: ParcelFileDescriptor? = null
+        return try {
+            descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            OpenRenderer(PdfRenderer(descriptor), descriptor)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            try {
+                descriptor?.close()
+            } catch (_: Throwable) {
+            }
+            null
+        }
+    }
+
+    private fun renderPageFrom(renderer: PdfRenderer, pageIndex: Int, scale: Float): Bitmap? {
+        synchronized(renderer) {
+            var page: PdfRenderer.Page? = null
+            return try {
+                page = renderer.openPage(pageIndex)
+                val width = (page.width * scale).toInt().coerceIn(80, 2048)
+                val height = (page.height * scale).toInt().coerceIn(80, 2048)
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(Color.WHITE)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                bitmap
+            } catch (e: Throwable) {
+                e.printStackTrace()
+                null
+            } finally {
+                try {
+                    page?.close()
+                } catch (_: Throwable) {
+                }
+            }
+        }
+    }
+
+    private fun comparePair(pageNumber: Int, left: Bitmap?, right: Bitmap?): PageComparison = when {
+        left == null || right == null -> PageComparison(
+            pageNumber = pageNumber,
+            status = DiffKind.MISSING,
+            ratio = 0f,
+            hasLeft = left != null,
+            hasRight = right != null
+        )
+        aspectDiffers(left, right) -> PageComparison(
+            pageNumber = pageNumber,
+            status = DiffKind.DIMENSION_MISMATCH,
+            ratio = 0f,
+            hasLeft = true,
+            hasRight = true
+        )
+        else -> {
+            val result = PageDiff.compare(thumbnail(left), thumbnail(right))
+            PageComparison(
+                pageNumber = pageNumber,
+                status = result.kind,
+                ratio = result.ratio,
+                hasLeft = true,
+                hasRight = true
+            )
+        }
+    }
+
+    private fun aspectDiffers(left: Bitmap, right: Bitmap): Boolean {
+        val leftAspect = left.width.toFloat() / left.height.coerceAtLeast(1).toFloat()
+        val rightAspect = right.width.toFloat() / right.height.coerceAtLeast(1).toFloat()
+        return abs(leftAspect - rightAspect) > 0.02f
+    }
+
+    private fun thumbnail(bitmap: Bitmap): IntArray {
+        val width = 96
+        val height = 128
+        val scaled = Bitmap.createScaledBitmap(bitmap, width, height, true)
+        val pixels = IntArray(width * height)
+        try {
+            scaled.getPixels(pixels, 0, width, 0, 0, width, height)
+        } finally {
+            if (scaled !== bitmap) scaled.recycle()
+        }
+        return pixels
+    }
+
+    private fun comparisonLabel(comparison: PageComparison, labels: ComparisonLabels): String {
+        val verdict = when (comparison.status) {
+            DiffKind.IDENTICAL -> labels.identical
+            DiffKind.DIFFERENT -> "${labels.different} · " + "%.2f %%".format(comparison.ratio * 100f)
+            DiffKind.DIMENSION_MISMATCH -> labels.differentFormat
+            DiffKind.MISSING -> labels.missing
+        }
+        return "Page ${comparison.pageNumber} — $verdict"
+    }
+
+    private fun caption(canvas: Canvas, name: String, rect: RectF) {
+        ToolRenderer.drawOverlay(
+            canvas,
+            TextOverlay(
+                text = name.take(48),
+                anchor = TextAnchor.TOP_LEFT,
+                fontSizePt = 9f,
+                colorArgb = 0xFF6B7280L,
+                bold = false,
+                opacity = 1f,
+                insetPt = 0f,
+                rotationDegrees = 0f
+            ),
+            rect
+        )
+    }
 
     /** One image file per page, in [targetDirectory]. */
     suspend fun exportPageImages(

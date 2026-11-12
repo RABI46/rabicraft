@@ -1,8 +1,10 @@
 package org.rabicraft.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,16 +29,23 @@ import androidx.compose.material.icons.automirrored.filled.BrandingWatermark
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.MergeType
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Approval
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.ImageSearch
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.ViewHeadline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -54,11 +64,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +89,8 @@ import org.rabicraft.app.model.ImageFormat
 import org.rabicraft.app.model.NUpSettings
 import org.rabicraft.app.model.PageNumberSettings
 import org.rabicraft.app.model.SplitSettings
+import org.rabicraft.app.model.StampPreset
+import org.rabicraft.app.model.StampSettings
 import org.rabicraft.app.model.TextAnchor
 import org.rabicraft.app.model.ToolConfig
 import org.rabicraft.app.model.ToolText
@@ -104,7 +119,24 @@ private val tools = listOf(
     ToolEntry(DocumentTool.EXTRACT, Icons.Default.ContentCut, { it.extract }, { it.extractHint }),
     ToolEntry(DocumentTool.TO_IMAGES, Icons.Default.Image, { it.toImages }, { it.toImagesHint }),
     ToolEntry(DocumentTool.OCR, Icons.Default.DocumentScanner, { it.ocr }, { it.ocrHint }),
-    ToolEntry(DocumentTool.MERGE, Icons.AutoMirrored.Filled.MergeType, { it.merge }, { it.mergeHint })
+    ToolEntry(DocumentTool.MERGE, Icons.AutoMirrored.Filled.MergeType, { it.merge }, { it.mergeHint }),
+    ToolEntry(DocumentTool.STAMP, Icons.Default.Approval, { it.stamp }, { it.stampHint }),
+    ToolEntry(DocumentTool.COMPARE, Icons.Default.Compare, { it.compare }, { it.compareHint }),
+    ToolEntry(
+        DocumentTool.IMAGES_TO_PDF,
+        Icons.Default.AddPhotoAlternate,
+        { it.imagesToPdf },
+        { it.imagesToPdfHint }
+    ),
+    ToolEntry(
+        DocumentTool.EXTRACT_IMAGES,
+        Icons.Default.ImageSearch,
+        { it.extractImages },
+        { it.extractImagesHint }
+    ),
+    ToolEntry(DocumentTool.SCAN_DOCUMENT, Icons.Default.PhotoCamera, { it.scanDocument }, { it.scanHint }),
+    ToolEntry(DocumentTool.CREATE_PDF, Icons.Default.NoteAdd, { it.createDocument }, { it.createDocumentHint }),
+    ToolEntry(DocumentTool.DETECT_FIELDS, Icons.Default.FactCheck, { it.detectFields }, { it.detectFieldsHint })
 )
 
 /**
@@ -117,7 +149,12 @@ fun ToolsScreen(
     isBusy: Boolean,
     onClose: () -> Unit,
     onApply: (ToolConfig) -> Unit,
-    onPickMergeFiles: () -> Unit
+    onPickMergeFiles: () -> Unit,
+    onPickCompareFile: () -> Unit,
+    onPickImageFiles: () -> Unit,
+    onScanDocument: () -> Unit,
+    onCreateDocument: () -> Unit,
+    onDetectFields: () -> Unit
 ) {
     val strings = LocalStrings.current
     var activeTool by remember { mutableStateOf<DocumentTool?>(null) }
@@ -178,6 +215,12 @@ fun ToolsScreen(
                             .clickable(enabled = !isBusy) {
                                 when (entry.tool) {
                                     DocumentTool.MERGE -> onPickMergeFiles()
+                                    DocumentTool.COMPARE -> onPickCompareFile()
+                                    DocumentTool.IMAGES_TO_PDF -> onPickImageFiles()
+                                    DocumentTool.EXTRACT_IMAGES -> onApply(ToolConfig.ExtractImages)
+                                    DocumentTool.SCAN_DOCUMENT -> onScanDocument()
+                                    DocumentTool.CREATE_PDF -> onCreateDocument()
+                                    DocumentTool.DETECT_FIELDS -> onDetectFields()
                                     DocumentTool.BOOKLET -> onApply(ToolConfig.Booklet)
                                     else -> activeTool = entry.tool
                                 }
@@ -261,6 +304,12 @@ private fun ToolConfigDialog(
     var extractRanges by remember(tool) { mutableStateOf("1-" + totalPages.coerceAtLeast(1)) }
     var pagesSpec by remember(tool) { mutableStateOf("") }
     var format by remember(tool) { mutableStateOf(ImageFormat.PNG) }
+    var stampPreset by remember(tool) { mutableStateOf(StampPreset.CONFIDENTIEL) }
+    var stampText by remember(tool) { mutableStateOf(StampPreset.CONFIDENTIEL.text) }
+    var stampColor by remember(tool) { mutableLongStateOf(StampPreset.CONFIDENTIEL.colorArgb) }
+    var stampOpacity by remember(tool) { mutableFloatStateOf(0.25f) }
+    var stampSize by remember(tool) { mutableFloatStateOf(54f) }
+    var stampFirstPage by remember(tool) { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -321,6 +370,48 @@ private fun ToolConfigDialog(
                         Spacer(modifier = Modifier.height(10.dp))
                         SliderRow(strings.fontSize, fontSize, 8f, 28f) { fontSize = it }
                         SelectionField(strings, pagesSpec) { pagesSpec = it }
+                    }
+
+                    DocumentTool.STAMP -> {
+                        Text(strings.stamp, fontWeight = FontWeight.Medium)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StampPreset.values().toList().chunked(2).forEach { row ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    row.forEach { preset ->
+                                        Chip(preset.text, stampPreset == preset) {
+                                            stampPreset = preset
+                                            stampText = preset.text
+                                            stampColor = preset.colorArgb
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = stampText,
+                            onValueChange = { stampText = it },
+                            label = { Text(strings.stampText) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("tool_stamp_text"),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(strings.colorLabel, fontWeight = FontWeight.Medium)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StampPreset.values().map { it.colorArgb }.distinct().forEach { colour ->
+                                ColourDot(colour, stampColor == colour) { stampColor = colour }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        SliderRow(strings.opacity, stampOpacity * 100f, 10f, 60f) {
+                            stampOpacity = it / 100f
+                        }
+                        SliderRow(strings.fontSize, stampSize, 24f, 96f) { stampSize = it }
+                        ToggleRow(strings.firstPageOnly, stampFirstPage) { stampFirstPage = it }
                     }
 
                     DocumentTool.WATERMARK -> {
@@ -516,7 +607,10 @@ private fun ToolConfigDialog(
                         SelectionField(strings, pagesSpec) { pagesSpec = it }
                     }
 
-                    DocumentTool.BOOKLET, DocumentTool.MERGE -> Unit
+                    DocumentTool.BOOKLET, DocumentTool.MERGE, DocumentTool.COMPARE,
+                    DocumentTool.IMAGES_TO_PDF, DocumentTool.EXTRACT_IMAGES,
+                    DocumentTool.SCAN_DOCUMENT, DocumentTool.CREATE_PDF,
+                    DocumentTool.DETECT_FIELDS -> Unit
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -607,10 +701,21 @@ private fun ToolConfigDialog(
                                         )
                                     )
                                     DocumentTool.OCR -> ToolConfig.Ocr(pagesSpec)
+                                    DocumentTool.STAMP -> ToolConfig.Stamp(
+                                        StampSettings(
+                                            preset = stampPreset,
+                                            text = stampText,
+                                            colorArgb = stampColor,
+                                            opacity = stampOpacity,
+                                            fontSizePt = stampSize,
+                                            firstPageOnly = stampFirstPage
+                                        )
+                                    )
                                     DocumentTool.BOOKLET -> ToolConfig.Booklet
-                                    // Merge is launched straight from its card: the user picks files
-                                    // in the system picker, so this dialog never opens for it.
-                                    DocumentTool.MERGE -> ToolConfig.Booklet
+                                    // Merge, compare, image extraction and images-to-PDF are
+                                    // launched straight from their card because they need a file
+                                    // picker, so this dialog never opens for them.
+                                    else -> ToolConfig.Booklet
                                 }
                             )
                         },
@@ -629,6 +734,26 @@ private fun ToolConfigDialog(
 @Composable
 private fun Label(value: String) {
     Text(value, fontWeight = FontWeight.Medium)
+}
+
+@Composable
+private fun ColourDot(colour: Long, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(Color(colour.toInt()))
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                },
+                shape = CircleShape
+            )
+            .clickable(onClick = onClick)
+    )
 }
 
 @Composable
