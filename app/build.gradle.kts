@@ -73,6 +73,8 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    // Reads the EXIF orientation a camera writes, so scanned pages are not laid out sideways.
+    implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

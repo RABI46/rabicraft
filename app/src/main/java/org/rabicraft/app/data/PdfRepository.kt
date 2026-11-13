@@ -1,5 +1,6 @@
 package org.rabicraft.app.data
 
+import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -14,6 +15,7 @@ import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.rabicraft.app.data.export.OverlayOp
@@ -22,6 +24,8 @@ import org.rabicraft.app.data.ocr.OcrPageResult
 import org.rabicraft.app.data.tools.DocumentEdgeDetector
 import org.rabicraft.app.data.tools.EmbeddedImageScanner
 import org.rabicraft.app.data.tools.FormFieldDetector
+import org.rabicraft.app.data.tools.ImageOrientation
+import org.rabicraft.app.data.tools.ImageTurn
 import org.rabicraft.app.data.tools.PageDiff
 import org.rabicraft.app.data.tools.TextBlock
 import org.rabicraft.app.data.tools.TextBlockKind
@@ -992,7 +996,13 @@ class PdfRepository(private val context: Context) {
         return sqrt(dx * dx + dy * dy)
     }
 
-    /** Decodes a picked image, downsampled so a 50 MP photo does not fill the heap. */
+    /**
+     * Decodes a picked image, downsampled so a 50 MP photo does not fill the heap, and turned the way
+     * its EXIF orientation asks.
+     *
+     * BitmapFactory ignores that tag, so without the turn a photo taken in portrait arrived on the
+     * page sideways — and the corner detection then looked for the sheet in a rotated picture.
+     */
     private fun decodeImage(uri: Uri, maxEdge: Int = IMAGE_PDF_MAX_EDGE): Bitmap? = try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use {
@@ -1004,12 +1014,57 @@ class PdfRepository(private val context: Context) {
             var sample = 1
             while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > maxEdge) sample *= 2
             val options = BitmapFactory.Options().apply { inSampleSize = sample }
-            context.contentResolver.openInputStream(uri)?.use {
+            val decoded = context.contentResolver.openInputStream(uri)?.use {
                 BitmapFactory.decodeStream(it, null, options)
             }
+            if (decoded == null) null else applyExifOrientation(uri, decoded)
         }
     } catch (e: Exception) {
         e.printStackTrace()
+        null
+    }
+
+    /**
+     * Turns [bitmap] as its EXIF header asks. A picture that is already upright, or whose header
+     * cannot be read, comes back untouched and is left for the caller to recycle.
+     */
+    private fun applyExifOrientation(uri: Uri, bitmap: Bitmap): Bitmap {
+        val turn = readExifTurn(uri) ?: return bitmap
+        if (turn == ImageTurn.NONE) return bitmap
+        val matrix = Matrix()
+        if (turn.mirrored) matrix.postScale(-1f, 1f)
+        if (turn.degrees != 0) matrix.postRotate(turn.degrees.toFloat())
+        return try {
+            val turned = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (turned !== bitmap) bitmap.recycle()
+            turned
+        } catch (e: Exception) {
+            e.printStackTrace()
+            bitmap
+        }
+    }
+
+    /**
+     * The EXIF orientation behind [uri], or null when it cannot be read.
+     *
+     * Document providers often hand a picture over as a content URI, which only the stream
+     * constructor can open; a picked file can be read directly. Neither failing is an error — the
+     * photo is then simply used as decoded.
+     */
+    @Suppress("DEPRECATION")
+    private fun readExifTurn(uri: Uri): ImageTurn? = try {
+        val exif = when (uri.scheme) {
+            ContentResolver.SCHEME_FILE -> uri.path?.let { ExifInterface(File(it)) }
+            ContentResolver.SCHEME_CONTENT ->
+                context.contentResolver.openInputStream(uri)?.use { ExifInterface(it) }
+            else -> null
+        }
+        exif?.let {
+            ImageOrientation.fromExifTag(
+                it.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            )
+        }
+    } catch (e: Exception) {
         null
     }
 
