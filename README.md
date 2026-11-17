@@ -1,8 +1,5 @@
 # RabiCraft for Android
 
-<p align="center">
-  <img src="assets/app-icon/hicolor/256x256/apps/org.rabicraft.rabicraft.png" width="96" height="96" alt="RabiCraft icon">
-</p>
 
 **RabiCraft** is the open-source PDF workbench for Android, built natively with Kotlin and Jetpack Compose. Read, organize, annotate, fill & sign, combine, split, and protect PDFs in a fast, privacy-first mobile application.
 
